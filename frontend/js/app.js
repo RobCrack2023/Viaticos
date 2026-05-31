@@ -1,3 +1,15 @@
+// ── PWA Install ──────────────────────────────────────────────────────────────
+let _installPrompt = null;
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const _isStandalone = window.matchMedia('(display-mode: standalone)').matches
+                   || window.navigator.standalone === true;
+
+// Capturar evento antes que el browser lo muestre automáticamente (Android)
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  _installPrompt = e;
+});
+
 // Utilidades globales
 function CLP(v) {
   if (v == null) return '—';
@@ -166,6 +178,72 @@ const App = (() => {
     }
   }
 
+  // ── Install PWA ────────────────────────────────────────────────────────────
+
+  function _shouldShowInstall() {
+    if (_isStandalone) return false;                          // ya instalada
+    const dismissed = localStorage.getItem("pwa_dismissed");
+    if (dismissed && Date.now() - parseInt(dismissed) < 7 * 86400000) return false; // recordada 7 días
+    return _installPrompt || _isIOS;                         // tiene prompt o es iOS
+  }
+
+  function showInstallBanner() {
+    if (!_shouldShowInstall()) return;
+    if (document.getElementById("install-banner")) return;   // ya visible
+
+    const banner = document.createElement("div");
+    banner.id = "install-banner";
+
+    if (_isIOS) {
+      banner.innerHTML = `
+        <div class="install-banner">
+          <div class="ib-icon">📲</div>
+          <div class="ib-body">
+            <div class="ib-title">Instalar Viáticos App</div>
+            <div class="ib-sub">Toca <strong>⎙ Compartir</strong> y luego <strong>"Agregar a inicio"</strong></div>
+          </div>
+          <button class="ib-close" onclick="App.dismissInstall()">✕</button>
+        </div>`;
+    } else {
+      banner.innerHTML = `
+        <div class="install-banner">
+          <div class="ib-icon">📲</div>
+          <div class="ib-body">
+            <div class="ib-title">Instalar Viáticos App</div>
+            <div class="ib-sub">Instala la app para usarla sin internet</div>
+          </div>
+          <div class="ib-actions">
+            <button class="ib-btn-yes" onclick="App.triggerInstall()">Instalar</button>
+            <button class="ib-btn-no"  onclick="App.dismissInstall()">Ahora no</button>
+          </div>
+        </div>`;
+    }
+
+    document.body.appendChild(banner);
+    // Animar entrada
+    requestAnimationFrame(() => banner.classList.add("show"));
+    // Auto-ocultar en 30 segundos
+    setTimeout(() => dismissInstall(), 30000);
+  }
+
+  async function triggerInstall() {
+    if (!_installPrompt) return;
+    _installPrompt.prompt();
+    const { outcome } = await _installPrompt.userChoice;
+    _installPrompt = null;
+    dismissInstall();
+    if (outcome === 'accepted') toast("¡App instalada correctamente!");
+  }
+
+  function dismissInstall() {
+    localStorage.setItem("pwa_dismissed", Date.now().toString());
+    const banner = document.getElementById("install-banner");
+    if (banner) {
+      banner.classList.remove("show");
+      setTimeout(() => banner.remove(), 400);
+    }
+  }
+
   function init() {
     const token = localStorage.getItem("token");
     if (token) {
@@ -177,15 +255,16 @@ const App = (() => {
 
     // Registrar Service Worker
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
-        console.log('SW registrado');
-      }).catch(console.error);
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
 
     Sync.init();
+
+    // Mostrar banner de instalación 3 segundos después de cargar
+    setTimeout(() => showInstallBanner(), 3000);
   }
 
-  return { navigate, toast, afterLogin, logout, refreshCurrentPage, downloadFile, init };
+  return { navigate, toast, afterLogin, logout, refreshCurrentPage, downloadFile, triggerInstall, dismissInstall, init };
 })();
 
 document.addEventListener("DOMContentLoaded", () => App.init());

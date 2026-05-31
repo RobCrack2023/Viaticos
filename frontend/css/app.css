@@ -559,6 +559,58 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   color: var(--warning);
 }
 
+/* ── PWA Install Banner ── */
+#install-banner {
+  position: fixed;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: calc(100% - 24px);
+  max-width: 460px;
+  z-index: 400;
+  opacity: 0;
+  transition: opacity .35s ease, transform .35s ease;
+  pointer-events: none;
+}
+#install-banner.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  pointer-events: auto;
+}
+.install-banner {
+  background: var(--text);
+  color: white;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-lg);
+}
+.ib-icon { font-size: 28px; flex-shrink: 0; }
+.ib-body { flex: 1; min-width: 0; }
+.ib-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+.ib-sub { font-size: 12px; color: rgba(255,255,255,.7); line-height: 1.4; }
+.ib-close {
+  background: rgba(255,255,255,.15); border: none; color: white;
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+  font-size: 13px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.ib-close:hover { background: rgba(255,255,255,.25); }
+.ib-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.ib-btn-yes {
+  background: var(--primary); color: white; border: none;
+  border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.ib-btn-yes:hover { background: var(--primary-dark); }
+.ib-btn-no {
+  background: none; color: rgba(255,255,255,.6); border: none;
+  font-size: 12px; cursor: pointer; padding: 2px; text-align: center;
+}
+.ib-btn-no:hover { color: white; }
+
 @media (min-width: 480px) {
   .content { max-width: 480px; margin: 0 auto; }
   .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
