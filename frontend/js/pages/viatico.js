@@ -175,8 +175,14 @@ const ViaticoPage = (() => {
         <div class="resultado-monto">${CLP(Math.abs(saldo))}</div>
       </div>`;
       html += `<div style="display:flex;gap:8px;margin-top:12px">
-        <a class="btn btn-outline" href="/api/reports/${v.id}/pdf" target="_blank">📄 PDF</a>
-        <a class="btn btn-outline" href="/api/reports/${v.id}/excel" target="_blank">📊 Excel</a>
+        <button class="btn btn-outline" style="flex:1"
+          onclick="App.downloadFile('/api/reports/${v.id}/pdf','rendicion_viatico_${v.id}.pdf')">
+          📄 PDF
+        </button>
+        <button class="btn btn-outline" style="flex:1"
+          onclick="App.downloadFile('/api/reports/${v.id}/excel','rendicion_viatico_${v.id}.xlsx')">
+          📊 Excel
+        </button>
       </div>`;
     }
 

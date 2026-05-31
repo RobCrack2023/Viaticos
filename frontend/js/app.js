@@ -121,6 +121,31 @@ const App = (() => {
     if (_currentPage) navigate(_currentPage);
   }
 
+  // Descarga un archivo con JWT — los <a href> no envían Authorization header
+  async function downloadFile(url, filename) {
+    const toastEl = document.getElementById("toast");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(url, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Error al descargar");
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err) {
+      toast("Error: " + err.message);
+    }
+  }
+
   function init() {
     const token = localStorage.getItem("token");
     if (token) {
@@ -139,7 +164,7 @@ const App = (() => {
     Sync.init();
   }
 
-  return { navigate, toast, afterLogin, logout, refreshCurrentPage, init };
+  return { navigate, toast, afterLogin, logout, refreshCurrentPage, downloadFile, init };
 })();
 
 document.addEventListener("DOMContentLoaded", () => App.init());
