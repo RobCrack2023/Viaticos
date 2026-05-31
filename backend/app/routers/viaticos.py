@@ -103,10 +103,6 @@ def create_viatico(data: ViaticoCreate, db: Session = Depends(get_db), current_u
         fecha_inicio=data.fecha_inicio or datetime.utcnow(),
         observaciones=data.observaciones,
     )
-    # Validar que fecha_inicio no sea futura (más de 1 día)
-    fecha_ini = data.fecha_inicio or datetime.utcnow()
-    if fecha_ini.date() > datetime.utcnow().date():
-        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser futura")
     db.add(v)
     db.commit()
     db.refresh(v)
@@ -146,8 +142,6 @@ def edit_viatico(data: ViaticoEdit, db: Session = Depends(get_db), current_user:
             raise HTTPException(status_code=404, detail="Tipo de acción no encontrado")
         v.action_type_id = data.action_type_id
     if data.fecha_inicio:
-        if data.fecha_inicio.date() > datetime.utcnow().date():
-            raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser futura")
         v.fecha_inicio = data.fecha_inicio
     if data.monto_asignado is not None:
         total_gastado = sum(m.monto for m in v.movements)

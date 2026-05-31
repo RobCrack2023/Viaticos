@@ -416,9 +416,6 @@ const ViaticoPage = (() => {
       fecha_inicio:   document.getElementById("edit-fecha")?.value + "T12:00:00",
       observaciones:  document.getElementById("edit-obs")?.value?.trim() || null,
     };
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
-    const fi = new Date(data.fecha_inicio);
-    if (fi > hoy) return App.toast("La fecha de inicio no puede ser futura");
     if (!data.monto_asignado || data.monto_asignado <= 0) return App.toast("Ingresa un monto válido");
 
     const btn = document.getElementById("edit-save-btn");
@@ -509,11 +506,6 @@ const ViaticoPage = (() => {
     if (!action_type_id)  return App.toast("Selecciona un tipo de acción");
     if (!monto_asignado || monto_asignado <= 0) return App.toast("Ingresa un monto válido");
     if (!fecha)           return App.toast("Ingresa la fecha de inicio");
-
-    // Validar que la fecha no sea futura
-    const hoy = new Date(); hoy.setHours(0,0,0,0);
-    const fi  = new Date(fecha + "T00:00:00");
-    if (fi > hoy) return App.toast("La fecha de inicio no puede ser futura");
 
     try {
       await API.createViatico({ client_id, project_id, action_type_id, monto_asignado, fecha_inicio: fecha + "T12:00:00" });
