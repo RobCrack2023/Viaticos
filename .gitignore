@@ -1,0 +1,31 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Base de datos (no subir datos locales)
+backend/*.db
+backend/*.db-wal
+backend/*.db-shm
+
+# Uploads (fotos locales)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Entorno
+backend/.env
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

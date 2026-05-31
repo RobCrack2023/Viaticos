@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\backend\\\\app\\\\models\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\backend\\\\app\\\\schemas\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\backend\\\\app\\\\routers\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\backend\\\\app\\\\core\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\backend\\\\uploads\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\frontend\\\\css\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\frontend\\\\js\\\\pages\")",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"C:\\\\proyectos_python\\\\Cuentas\\\\frontend\\\\icons\")",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "viaticos-backend",
+      "runtimeExecutable": "C:\\proyectos_python\\Cuentas\\backend\\venv\\Scripts\\python.exe",
+      "runtimeArgs": ["C:\\proyectos_python\\Cuentas\\backend\\run.py"],
+      "port": 8000
+    }
+  ]
+}
