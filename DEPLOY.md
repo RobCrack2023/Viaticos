@@ -63,7 +63,7 @@ Generar una clave segura:
 ```bash
 python3 -c "import secrets; print(secrets.token_hex(32))"
 ```
-
+e76f7ca9ce81bfa21d256ff08ac0bb5d6ebe9fec265e01136d647e842274deed
 ---
 
 ## 5. Crear directorios necesarios

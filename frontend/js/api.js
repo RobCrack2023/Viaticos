@@ -121,6 +121,7 @@ const API = (() => {
     excelUrl: (id) => `${BASE}/reports/${id}/excel`,
 
     // Admin
+    listAllViaticos:  (status) => req("GET", `/admin/viaticos${status ? `?status_filter=${status}` : ""}`),
     listUsers:        () => req("GET",  "/admin/users"),
     createUser:       (data) => req("POST", "/admin/users", data),
     updateUser:       (id, data) => req("PUT", `/admin/users/${id}`, data),

@@ -5,9 +5,11 @@ const AdminPage = (() => {
   function render() {
     return `
       <div class="topbar">
-        <button class="back-btn" onclick="App.navigate('dashboard')">‹</button>
         <h1>Administración</h1>
-        <button class="menu-btn" id="adm-add-btn" title="Agregar">＋</button>
+        <div style="display:flex;gap:6px">
+          <button class="menu-btn" id="adm-add-btn" title="Agregar">＋</button>
+          <button class="menu-btn" id="adm-logout-btn" style="font-size:13px;font-weight:700">Salir</button>
+        </div>
       </div>
       <div style="padding:12px 16px 0">
         <div class="tabs">
@@ -222,6 +224,7 @@ const AdminPage = (() => {
   }
 
   function bind() {
+    document.getElementById("adm-logout-btn")?.addEventListener("click", () => App.logout());
     document.getElementById("adm-add-btn")?.addEventListener("click", () => newItem());
     document.getElementById("adm-modal")?.addEventListener("click", (e) => {
       if (e.target === document.getElementById("adm-modal")) closeModal();

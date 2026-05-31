@@ -1,19 +1,60 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from ..database import get_db
 from ..models.user import User
 from ..models.client import Client
 from ..models.project import Project
 from ..models.action_type import ActionType
+from ..models.viatico import Viatico, ViaticoMovement
 from ..schemas.user import UserCreate, UserUpdate, UserOut
 from ..schemas.client import ClientCreate, ClientUpdate, ClientOut
 from ..schemas.project import ProjectCreate, ProjectUpdate, ProjectOut
 from ..schemas.action_type import ActionTypeCreate, ActionTypeUpdate, ActionTypeOut
+from ..schemas.viatico import ViaticoOut
 from ..core.security import hash_password
 from .auth import require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+# ── Viáticos (todos los usuarios) ─────────────────────────────────────────────
+
+def _build_viatico_out(v: Viatico) -> dict:
+    total = sum(m.monto for m in v.movements)
+    saldo = v.monto_asignado - total
+    return {
+        "id": v.id,
+        "user_id": v.user_id,
+        "user_nombre": v.user.nombre if v.user else "",
+        "client_id": v.client_id,
+        "project_id": v.project_id,
+        "action_type_id": v.action_type_id,
+        "client_nombre": v.client.nombre if v.client else "",
+        "project_nombre": v.project.nombre if v.project else "",
+        "action_type_nombre": v.action_type.nombre if v.action_type else "",
+        "monto_asignado": v.monto_asignado,
+        "status": v.status,
+        "fecha_inicio": v.fecha_inicio,
+        "fecha_cierre": v.fecha_cierre,
+        "observaciones": v.observaciones,
+        "saldo_actual": saldo,
+        "total_gastos": total,
+        "movements": v.movements,
+    }
+
+
+@router.get("/viaticos")
+def list_all_viaticos(
+    status_filter: Optional[str] = None,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    q = db.query(Viatico)
+    if status_filter:
+        q = q.filter(Viatico.status == status_filter)
+    viaticos = q.order_by(Viatico.fecha_inicio.desc()).all()
+    return [_build_viatico_out(v) for v in viaticos]
 
 
 # ── Usuarios ──────────────────────────────────────────────────────────────────
