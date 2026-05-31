@@ -101,6 +101,10 @@ def create_viatico(data: ViaticoCreate, db: Session = Depends(get_db), current_u
         fecha_inicio=data.fecha_inicio or datetime.utcnow(),
         observaciones=data.observaciones,
     )
+    # Validar que fecha_inicio no sea futura (más de 1 día)
+    fecha_ini = data.fecha_inicio or datetime.utcnow()
+    if fecha_ini.date() > datetime.utcnow().date():
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser futura")
     db.add(v)
     db.commit()
     db.refresh(v)
@@ -124,8 +128,15 @@ def list_viaticos(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.post("/active/close", response_model=ViaticoOut)
 def close_viatico(data: ViaticoClose, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     v = _active_viatico(current_user, db)
+    fecha_cierre = datetime.utcnow()
+    # Validar que cierre no sea anterior a inicio
+    if fecha_cierre.date() < v.fecha_inicio.date():
+        raise HTTPException(
+            status_code=400,
+            detail=f"La fecha de cierre ({fecha_cierre.strftime('%d/%m/%Y')}) no puede ser anterior a la fecha de inicio ({v.fecha_inicio.strftime('%d/%m/%Y')})"
+        )
     v.status = ViaticoStatus.cerrado
-    v.fecha_cierre = datetime.utcnow()
+    v.fecha_cierre = fecha_cierre
     if data.observaciones:
         v.observaciones = data.observaciones
     db.commit()

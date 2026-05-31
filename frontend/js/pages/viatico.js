@@ -347,12 +347,22 @@ const ViaticoPage = (() => {
     const action_type_id = parseInt(document.getElementById("viat-action").value);
     const monto_asignado = parseFloat(document.getElementById("viat-monto").value);
     const fecha = document.getElementById("viat-fecha").value;
-    if (!client_id || !project_id || !action_type_id || !monto_asignado)
-      return App.toast("Completa todos los campos");
+
+    if (!client_id)       return App.toast("Selecciona un cliente");
+    if (!project_id)      return App.toast("Selecciona un proyecto");
+    if (!action_type_id)  return App.toast("Selecciona un tipo de acción");
+    if (!monto_asignado || monto_asignado <= 0) return App.toast("Ingresa un monto válido");
+    if (!fecha)           return App.toast("Ingresa la fecha de inicio");
+
+    // Validar que la fecha no sea futura
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const fi  = new Date(fecha + "T00:00:00");
+    if (fi > hoy) return App.toast("La fecha de inicio no puede ser futura");
+
     try {
       await API.createViatico({ client_id, project_id, action_type_id, monto_asignado, fecha_inicio: fecha + "T12:00:00" });
       await load();
-      App.toast("✓ Viático iniciado");
+      App.toast("Viático iniciado");
     } catch (err) {
       App.toast("Error: " + err.message);
     }
