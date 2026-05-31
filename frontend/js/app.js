@@ -149,7 +149,8 @@ const App = (() => {
   function init() {
     const token = localStorage.getItem("token");
     if (token) {
-      navigate('dashboard');
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      navigate(user.is_admin ? 'admin' : 'dashboard');
     } else {
       navigate('login');
     }
