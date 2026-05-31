@@ -210,10 +210,19 @@ const AccountPage = (() => {
         if (cached) {
           const fakeMv = { id: Date.now(), ...data, fecha: data.fecha || new Date().toISOString(), created_at: new Date().toISOString(), foto_path: null, __pending: true };
           cached.movements = [...(cached.movements || []), fakeMv];
-          // Recalcular saldo
           cached.saldo_actual = cached.saldo_inicial + cached.movements.reduce((s, m) => m.tipo === "ingreso" ? s + m.monto : s - m.monto, 0);
           await DB.saveCache("account", cached);
           _account = cached;
+        }
+        // Guardar foto en IndexedDB si la hay
+        const fotoOffline = document.getElementById("mv-foto-input")?.files[0];
+        if (fotoOffline && mv.__opId) {
+          const b64 = await API._fileToBase64(fotoOffline);
+          await DB.updateOp(mv.__opId, {
+            photoData: b64,
+            photoName: fotoOffline.name,
+            photoPath: "/account/movements/{id}/foto",
+          });
         }
         closeModal();
         renderContent();

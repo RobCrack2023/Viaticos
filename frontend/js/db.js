@@ -66,8 +66,13 @@ const DB = (() => {
     getCache: async (key) => { const r = await get("cache", key); return r?.data; },
 
     // Cola de operaciones offline pendientes
-    queueOp: (op) => set("pending_ops", op),
+    queueOp: (op) => set("pending_ops", op),       // retorna el ID asignado
     getPendingOps: () => getAll("pending_ops"),
     clearOp: (id) => del("pending_ops", id),
+    updateOp: async (id, updates) => {              // agrega datos extra (ej: foto)
+      const op = await get("pending_ops", id);
+      if (!op) return;
+      return set("pending_ops", { ...op, ...updates });
+    },
   };
 })();

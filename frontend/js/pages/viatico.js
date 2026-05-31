@@ -266,6 +266,16 @@ const ViaticoPage = (() => {
           await DB.saveCache("viatico_active", cached);
           _viatico = cached;
         }
+        // Guardar foto en IndexedDB si la hay
+        const fotoOffline = document.getElementById("vmv-foto-input")?.files[0];
+        if (fotoOffline && mv.__opId) {
+          const b64 = await API._fileToBase64(fotoOffline);
+          await DB.updateOp(mv.__opId, {
+            photoData: b64,
+            photoName: fotoOffline.name,
+            photoPath: "/viaticos/movements/{id}/foto",
+          });
+        }
         closeModal();
         renderActive();
         App.toast("⏳ Sin conexión — guardado localmente, se sincronizará");

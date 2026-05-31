@@ -3,27 +3,52 @@ const Sync = (() => {
   async function flushPending() {
     const ops = await DB.getPendingOps();
     if (!ops.length) return;
+    const token = localStorage.getItem("token");
     let synced = 0;
+
     for (const op of ops) {
       try {
         const res = await fetch("/api" + op.path, {
           method: op.method,
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            "Authorization": `Bearer ${token}`,
           },
           body: op.body ? JSON.stringify(op.body) : undefined,
         });
+
         if (res.ok || res.status === 204) {
+          // Si el movimiento creado tiene foto adjunta → subirla ahora
+          if (op.photoData && op.method === "POST" && op.photoPath) {
+            try {
+              const created = await res.clone().json().catch(() => null);
+              const mvId = created?.id;
+              if (mvId) {
+                const photoEndpoint = op.photoPath.replace("{id}", mvId);
+                // Convertir base64 de vuelta a Blob
+                const fetchBlob = await fetch(op.photoData);
+                const blob = await fetchBlob.blob();
+                const fd = new FormData();
+                fd.append("foto", blob, op.photoName || "foto.jpg");
+                await fetch("/api" + photoEndpoint, {
+                  method: "POST",
+                  headers: { "Authorization": `Bearer ${token}` },
+                  body: fd,
+                });
+              }
+            } catch (_) {
+              // No bloquear la sync si falla solo la foto
+            }
+          }
           await DB.clearOp(op.id);
           synced++;
         }
       } catch (_) {
-        break; // Si falla uno, aún offline — detener
+        break; // Aún sin conexión — detener
       }
     }
+
     if (synced > 0) {
-      // Limpiar caché para forzar datos frescos del servidor
       await DB.saveCache("account", null);
       await DB.saveCache("viatico_active", null);
       App.toast(`Sincronizado: ${synced} operación(es) enviada(s)`);

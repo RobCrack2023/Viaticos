@@ -36,43 +36,55 @@ const API = (() => {
     }
   }
 
-  // GET con cache automático en IndexedDB — clave para offline
+  // GET con cache automático en IndexedDB
   async function cachedGet(cacheKey, path) {
     try {
       const data = await req("GET", path);
-      await DB.saveCache(cacheKey, data);   // guarda al traer con conexión
+      await DB.saveCache(cacheKey, data);
       return data;
     } catch (err) {
       if (err.message === "__OFFLINE__") {
         const cached = await DB.getCache(cacheKey);
-        if (cached !== undefined) return cached;  // sirve dato guardado
+        if (cached !== undefined) return cached;
         throw new Error("Sin conexión y sin datos en caché");
       }
       throw err;
     }
   }
 
-  // POST/PUT/DELETE: si hay conexión ejecuta normal; si no, encola en IndexedDB
+  // POST/PUT/DELETE: encola en IndexedDB si offline. Retorna __opId para adjuntar foto.
   async function queuedWrite(method, path, body) {
     if (!navigator.onLine) {
-      await DB.queueOp({ method, path, body, ts: Date.now() });
-      return { __queued: true };   // señal para que la UI haga optimistic update
+      const opId = await DB.queueOp({ method, path, body, ts: Date.now() });
+      return { __queued: true, __opId: opId };
     }
     try {
       return await req(method, path, body);
     } catch (err) {
       if (err.message === "__OFFLINE__") {
-        await DB.queueOp({ method, path, body, ts: Date.now() });
-        return { __queued: true };
+        const opId = await DB.queueOp({ method, path, body, ts: Date.now() });
+        return { __queued: true, __opId: opId };
       }
       throw err;
     }
   }
 
+  // Lee un File como base64 para guardar en IndexedDB
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   return {
+    _fileToBase64: fileToBase64,
+
     // Auth
     login: (email, password) => req("POST", "/auth/login", { email, password }),
-    me: () => req("GET", "/auth/me"),
+    me:    () => req("GET", "/auth/me"),
 
     // Account — con cache offline
     initAccount:    (saldo_inicial) => req("POST", "/account/init", { saldo_inicial }),
@@ -86,19 +98,19 @@ const API = (() => {
       return req("POST", `/account/movements/${id}/foto`, fd, true);
     },
 
-    // Viático selects
-    selectClients:    () => cachedGet("select_clients",      "/viaticos/select/clients"),
-    selectProjects:   (clientId) => cachedGet(`select_projects_${clientId||0}`, `/viaticos/select/projects${clientId ? `?client_id=${clientId}` : ""}`),
-    selectActionTypes:() => cachedGet("select_actions",      "/viaticos/select/action-types"),
+    // Viático selects — con cache
+    selectClients:     () => cachedGet("select_clients", "/viaticos/select/clients"),
+    selectProjects:    (clientId) => cachedGet(`select_projects_${clientId||0}`, `/viaticos/select/projects${clientId ? `?client_id=${clientId}` : ""}`),
+    selectActionTypes: () => cachedGet("select_actions", "/viaticos/select/action-types"),
 
     // Viáticos — con cache offline
-    createViatico:        (data) => req("POST", "/viaticos", data),
-    getActiveViatico:     () => cachedGet("viatico_active", "/viaticos/active"),
-    listViaticos:         () => cachedGet("viaticos_list",  "/viaticos"),
-    closeViatico:         (data) => req("POST", "/viaticos/active/close", data),
-    addViaticoMovement:   (data) => queuedWrite("POST", "/viaticos/active/movements", data),
-    updateViaticoMovement:(id, data) => queuedWrite("PUT", `/viaticos/movements/${id}`, data),
-    deleteViaticoMovement:(id) => queuedWrite("DELETE", `/viaticos/movements/${id}`, null),
+    createViatico:         (data) => req("POST", "/viaticos", data),
+    getActiveViatico:      () => cachedGet("viatico_active", "/viaticos/active"),
+    listViaticos:          () => cachedGet("viaticos_list", "/viaticos"),
+    closeViatico:          (data) => req("POST", "/viaticos/active/close", data),
+    addViaticoMovement:    (data) => queuedWrite("POST", "/viaticos/active/movements", data),
+    updateViaticoMovement: (id, data) => queuedWrite("PUT", `/viaticos/movements/${id}`, data),
+    deleteViaticoMovement: (id) => queuedWrite("DELETE", `/viaticos/movements/${id}`, null),
     uploadFotoViatico: (id, file) => {
       const fd = new FormData(); fd.append("foto", file);
       return req("POST", `/viaticos/movements/${id}/foto`, fd, true);
