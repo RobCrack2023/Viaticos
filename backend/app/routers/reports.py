@@ -24,7 +24,11 @@ CLP = lambda v: f"${v:,.0f}".replace(",", ".")
 
 
 def _get_viatico(viatico_id: int, user: User, db: Session) -> Viatico:
-    v = db.query(Viatico).filter(Viatico.id == viatico_id, Viatico.user_id == user.id).first()
+    q = db.query(Viatico).filter(Viatico.id == viatico_id)
+    # Admin puede ver cualquier viático; usuario solo los suyos
+    if not user.is_admin:
+        q = q.filter(Viatico.user_id == user.id)
+    v = q.first()
     if not v:
         raise HTTPException(status_code=404, detail="Viático no encontrado")
     return v
