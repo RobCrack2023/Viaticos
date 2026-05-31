@@ -15,7 +15,21 @@ const API = (() => {
       const res = await fetch(BASE + path, opts);
       if (res.status === 204) return null;
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Error en servidor");
+      if (!res.ok) {
+        let msg = "Error en servidor";
+        if (data.detail) {
+          if (typeof data.detail === "string") {
+            msg = data.detail;
+          } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+            // FastAPI validation errors: array of {msg, loc, type}
+            msg = data.detail.map(e => {
+              const field = e.loc?.slice(1).join(" → ") || "";
+              return field ? `${field}: ${e.msg}` : e.msg;
+            }).join(" | ");
+          }
+        }
+        throw new Error(msg);
+      }
       return data;
     } catch (err) {
       if (err.message === "Failed to fetch") throw new Error("Sin conexión al servidor");
