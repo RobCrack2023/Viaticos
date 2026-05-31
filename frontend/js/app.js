@@ -34,8 +34,8 @@ const App = (() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (def.adminOnly && !user.is_admin) return;
 
-    // Usuario normal sin viático: "Inicio" redirige a viático
-    if (pageName === 'dashboard' && !user.is_admin) {
+    // Usuario normal sin viático: "Inicio" y "Cuenta" redirigen a crear viático
+    if ((pageName === 'dashboard' || pageName === 'account') && !user.is_admin) {
       try {
         const v = await API.getActiveViatico();
         if (!v) { _doNavigate('viatico', user); return; }
