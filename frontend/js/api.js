@@ -1,7 +1,7 @@
 const API = (() => {
   const BASE = "/api";
 
-  function token() { return localStorage.getItem("token"); }
+  function token() { return Store.get("token"); }
 
   async function req(method, path, body, isForm = false) {
     const headers = {};

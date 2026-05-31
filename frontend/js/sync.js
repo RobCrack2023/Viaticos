@@ -3,7 +3,7 @@ const Sync = (() => {
   async function flushPending() {
     const ops = await DB.getPendingOps();
     if (!ops.length) return;
-    const token = localStorage.getItem("token");
+    const token = Store.get("token");
     let synced = 0;
 
     for (const op of ops) {

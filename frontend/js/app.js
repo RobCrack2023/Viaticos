@@ -1,23 +1,37 @@
-// ── PWA Install ──────────────────────────────────────────────────────────────
+// -- Almacenamiento seguro (sessionStorage por defecto) ----------------------
+const Store = {
+  set(key, value, remember = false) {
+    const store = remember ? localStorage : sessionStorage;
+    store.setItem(key, value);
+    (remember ? sessionStorage : localStorage).removeItem(key);
+  },
+  get: (key) => sessionStorage.getItem(key) || localStorage.getItem(key),
+  remove(key) {
+    sessionStorage.removeItem(key);
+    localStorage.removeItem(key);
+  },
+  isRemembered: () => !!localStorage.getItem("token"),
+};
+
+// -- PWA Install --------------------------------------------------------------
 let _installPrompt = null;
 const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 const _isStandalone = window.matchMedia('(display-mode: standalone)').matches
                    || window.navigator.standalone === true;
 
-// Capturar evento antes que el browser lo muestre automáticamente (Android)
 window.addEventListener('beforeinstallprompt', (e) => {
   e.preventDefault();
   _installPrompt = e;
 });
 
-// Utilidades globales
+// -- Utilidades globales ------------------------------------------------------
 function CLP(v) {
-  if (v == null) return '—';
+  if (v == null) return '--';
   return '$' + Math.round(v).toLocaleString('es-CL');
 }
 
 function fmtDate(iso) {
-  if (!iso) return '—';
+  if (!iso) return '--';
   const d = new Date(iso);
   return d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -26,7 +40,7 @@ function today() {
   return new Date().toISOString().substring(0, 10);
 }
 
-// App principal
+// -- App principal ------------------------------------------------------------
 const App = (() => {
   const pages = {
     login:          { module: () => LoginPage,        nav: false },
@@ -44,10 +58,10 @@ const App = (() => {
     const def = pages[pageName];
     if (!def) return;
 
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const user = JSON.parse(Store.get("user") || "{}");
     if (def.adminOnly && !user.is_admin) return;
 
-    // Usuario normal sin viático: "Inicio" y "Cuenta" redirigen a crear viático
+    // Usuario normal sin viatico: "Inicio" y "Cuenta" redirigen a crear viatico
     if ((pageName === 'dashboard' || pageName === 'account') && !user.is_admin) {
       try {
         const v = await API.getActiveViatico();
@@ -68,7 +82,7 @@ const App = (() => {
     const mod = def.module();
 
     shell.innerHTML = `
-      <div id="offline-banner">⚡ Sin conexión — los datos se sincronizarán al volver</div>
+      <div id="offline-banner">Sin conexion -- los datos se sincronizaran al volver</div>
       ${mod.render()}
       ${def.nav ? renderBottomNav(pageName, user) : ''}
       <div id="toast"></div>`;
@@ -91,12 +105,11 @@ const App = (() => {
   };
 
   function renderBottomNav(active, user) {
-    // Admin tiene su propio set de tabs
     if (user.is_admin) {
       const adminTabs = [
-        { id: 'admin',          label: 'Gestión'  },
+        { id: 'admin',          label: 'Gestion'  },
         { id: 'admin_stats',    label: 'Informes' },
-        { id: 'admin_viaticos', label: 'Viáticos' },
+        { id: 'admin_viaticos', label: 'Viaticos' },
       ];
       return `<nav class="bottom-nav">
         ${adminTabs.map(t => `
@@ -106,11 +119,10 @@ const App = (() => {
       </nav>`;
     }
 
-    // Usuario normal
     const tabs = [
       { id: 'dashboard', label: 'Inicio'  },
       { id: 'account',   label: 'Cuenta'  },
-      { id: 'viatico',   label: 'Viático' },
+      { id: 'viatico',   label: 'Viatico' },
     ];
     return `<nav class="bottom-nav">
       ${tabs.map(t => `
@@ -133,7 +145,6 @@ const App = (() => {
       navigate('admin');
       return;
     }
-    // Usuario normal: si no tiene viático activo → pantalla de creación
     try {
       const v = await API.getActiveViatico();
       if (!v) { navigate('viatico'); return; }
@@ -143,24 +154,44 @@ const App = (() => {
     navigate('dashboard');
   }
 
+  // -- Inactividad ------------------------------------------------------------
+  const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutos
+  let _inactivityTimer = null;
+
+  function _resetInactivity() {
+    if (!Store.get("token")) return;
+    clearTimeout(_inactivityTimer);
+    _inactivityTimer = setTimeout(() => {
+      logout();
+      setTimeout(() => toast("Sesion cerrada por inactividad (30 min)"), 300);
+    }, INACTIVITY_MS);
+  }
+
+  function _initInactivityWatcher() {
+    ["click", "touchstart", "keydown", "scroll", "mousemove"].forEach(ev =>
+      document.addEventListener(ev, _resetInactivity, { passive: true })
+    );
+    _resetInactivity();
+  }
+
   function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate('login');
+    clearTimeout(_inactivityTimer);
+    Store.remove("token");
+    Store.remove("user");
+    _doNavigate('login', {});
   }
 
   function refreshCurrentPage() {
     if (_currentPage) {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const user = JSON.parse(Store.get("user") || "{}");
       _doNavigate(_currentPage, user);
     }
   }
 
-  // Descarga un archivo con JWT — los <a href> no envían Authorization header
+  // -- Descarga autenticada ---------------------------------------------------
   async function downloadFile(url, filename) {
-    const toastEl = document.getElementById("toast");
     try {
-      const token = localStorage.getItem("token");
+      const token = Store.get("token");
       const res = await fetch(url, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -181,18 +212,17 @@ const App = (() => {
     }
   }
 
-  // ── Install PWA ────────────────────────────────────────────────────────────
-
+  // -- PWA Install ------------------------------------------------------------
   function _shouldShowInstall() {
-    if (_isStandalone) return false;                          // ya instalada
+    if (_isStandalone) return false;
     const dismissed = localStorage.getItem("pwa_dismissed");
-    if (dismissed && Date.now() - parseInt(dismissed) < 7 * 86400000) return false; // recordada 7 días
-    return _installPrompt || _isIOS;                         // tiene prompt o es iOS
+    if (dismissed && Date.now() - parseInt(dismissed) < 7 * 86400000) return false;
+    return _installPrompt || _isIOS;
   }
 
   function showInstallBanner() {
     if (!_shouldShowInstall()) return;
-    if (document.getElementById("install-banner")) return;   // ya visible
+    if (document.getElementById("install-banner")) return;
 
     const banner = document.createElement("div");
     banner.id = "install-banner";
@@ -202,8 +232,8 @@ const App = (() => {
         <div class="install-banner">
           <div class="ib-icon">📲</div>
           <div class="ib-body">
-            <div class="ib-title">Instalar Viáticos App</div>
-            <div class="ib-sub">Toca <strong>⎙ Compartir</strong> y luego <strong>"Agregar a inicio"</strong></div>
+            <div class="ib-title">Instalar Viaticos App</div>
+            <div class="ib-sub">Toca <strong>Compartir</strong> y luego <strong>"Agregar a inicio"</strong></div>
           </div>
           <button class="ib-close" onclick="App.dismissInstall()">✕</button>
         </div>`;
@@ -212,7 +242,7 @@ const App = (() => {
         <div class="install-banner">
           <div class="ib-icon">📲</div>
           <div class="ib-body">
-            <div class="ib-title">Instalar Viáticos App</div>
+            <div class="ib-title">Instalar Viaticos App</div>
             <div class="ib-sub">Instala la app para usarla sin internet</div>
           </div>
           <div class="ib-actions">
@@ -223,9 +253,7 @@ const App = (() => {
     }
 
     document.body.appendChild(banner);
-    // Animar entrada
     requestAnimationFrame(() => banner.classList.add("show"));
-    // Auto-ocultar en 30 segundos
     setTimeout(() => dismissInstall(), 30000);
   }
 
@@ -235,7 +263,7 @@ const App = (() => {
     const { outcome } = await _installPrompt.userChoice;
     _installPrompt = null;
     dismissInstall();
-    if (outcome === 'accepted') toast("¡App instalada correctamente!");
+    if (outcome === 'accepted') toast("App instalada correctamente!");
   }
 
   function dismissInstall() {
@@ -247,23 +275,22 @@ const App = (() => {
     }
   }
 
+  // -- Init -------------------------------------------------------------------
   function init() {
-    const token = localStorage.getItem("token");
+    const token = Store.get("token");
     if (token) {
-      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const user = JSON.parse(Store.get("user") || "{}");
       navigate(user.is_admin ? 'admin' : 'dashboard');
     } else {
       navigate('login');
     }
 
-    // Registrar Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
 
     Sync.init();
-
-    // Mostrar banner de instalación 3 segundos después de cargar
+    _initInactivityWatcher();
     setTimeout(() => showInstallBanner(), 3000);
   }
 

@@ -14,8 +14,17 @@ const LoginPage = (() => {
             <label>Contraseña</label>
             <input id="login-password" type="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
           </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+            <input type="checkbox" id="login-remember" style="width:16px;height:16px;cursor:pointer;accent-color:var(--primary)">
+            <label for="login-remember" style="font-size:13px;color:var(--muted);cursor:pointer;margin:0">
+              Recordar sesión en este dispositivo
+            </label>
+          </div>
           <button class="btn btn-primary" id="login-btn">Ingresar</button>
-          <p id="login-error" style="color:var(--danger);font-size:13px;margin-top:10px;text-align:center;display:none"></p>
+          <p style="font-size:11px;color:#94A3B8;text-align:center;margin-top:12px">
+            Sin "Recordar sesión" la sesión se cerrará al cerrar el navegador
+          </p>
+          <p id="login-error" style="color:var(--danger);font-size:13px;margin-top:8px;text-align:center;display:none"></p>
         </div>
       </div>`;
   }
@@ -36,9 +45,10 @@ const LoginPage = (() => {
     btn.disabled = true;
     btn.textContent = "Ingresando...";
     try {
+      const remember = document.getElementById("login-remember")?.checked || false;
       const res = await API.login(email, password);
-      localStorage.setItem("token", res.access_token);
-      localStorage.setItem("user", JSON.stringify(res.user));
+      Store.set("token", res.access_token, remember);
+      Store.set("user", JSON.stringify(res.user), remember);
       App.afterLogin(res.user);
     } catch (err) {
       errEl.textContent = err.message;
