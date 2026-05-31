@@ -6,14 +6,17 @@ Guía para servidor con otras aplicaciones ya corriendo (Nginx existente).
 
 ## 1. Requisitos previos en el servidor
 
+Python 3.10.12 ya viene instalado en Ubuntu 22.04. Solo necesitas el módulo `venv` y herramientas de red:
+
 ```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3.11 python3.11-venv python3-pip git nginx
+sudo apt update
+sudo apt install -y python3.10-venv python3-pip git nginx
 ```
 
-Verificar Python:
+Verificar Python (ya debe estar):
 ```bash
-python3.11 --version   # Python 3.11.x
+python3 --version      # Python 3.10.12
+python3 -m venv --help # verificar que venv está disponible
 ```
 
 ---
@@ -33,7 +36,7 @@ cd /var/www/viaticos
 
 ```bash
 cd /var/www/viaticos/backend
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -90,7 +93,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=/var/www/viaticos/backend
 Environment="PATH=/var/www/viaticos/backend/venv/bin"
-ExecStart=/var/www/viaticos/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 2
+ExecStart=/var/www/viaticos/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 1
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
