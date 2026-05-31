@@ -107,6 +107,8 @@ const API = (() => {
     createViatico:         (data) => req("POST", "/viaticos", data),
     getActiveViatico:      () => cachedGet("viatico_active", "/viaticos/active"),
     listViaticos:          () => cachedGet("viaticos_list", "/viaticos"),
+    editViatico:           (data) => req("PUT",  "/viaticos/active/edit", data),
+    addAdicional:          (data) => req("POST", "/viaticos/active/adicional", data),
     closeViatico:          (data) => req("POST", "/viaticos/active/close", data),
     addViaticoMovement:    (data) => queuedWrite("POST", "/viaticos/active/movements", data),
     updateViaticoMovement: (id, data) => queuedWrite("PUT", `/viaticos/movements/${id}`, data),

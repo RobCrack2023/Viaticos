@@ -49,6 +49,38 @@ const ViaticoPage = (() => {
         </div>
       </div>
 
+      <!-- Modal editar viático (una vez) -->
+      <div class="modal-overlay" id="edit-modal">
+        <div class="modal">
+          <div class="modal-title">
+            <span>Editar viático <small style="font-size:12px;color:var(--warning)">(solo una vez)</small></span>
+            <button class="modal-close" onclick="document.getElementById('edit-modal').classList.remove('open')">✕</button>
+          </div>
+          <div id="edit-modal-body"></div>
+          <button class="btn btn-primary" id="edit-save-btn" onclick="ViaticoPage.saveEdit()">Guardar cambios</button>
+        </div>
+      </div>
+
+      <!-- Modal monto adicional -->
+      <div class="modal-overlay" id="adicional-modal">
+        <div class="modal">
+          <div class="modal-title">
+            <span>Agregar monto adicional</span>
+            <button class="modal-close" onclick="document.getElementById('adicional-modal').classList.remove('open')">✕</button>
+          </div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Agrega fondos extra al viático cuando el monto original no es suficiente.</p>
+          <div class="form-group">
+            <label>Monto adicional ($)</label>
+            <input id="adic-monto" type="number" class="form-control" placeholder="0" min="1">
+          </div>
+          <div class="form-group">
+            <label>Motivo (opcional)</label>
+            <input id="adic-motivo" type="text" class="form-control" placeholder="Ej: Extensión del proyecto">
+          </div>
+          <button class="btn btn-primary" id="adic-save-btn" onclick="ViaticoPage.saveAdicional()">Agregar fondos</button>
+        </div>
+      </div>
+
       <!-- Modal cerrar viático -->
       <div class="modal-overlay" id="close-modal">
         <div class="modal">
@@ -165,7 +197,31 @@ const ViaticoPage = (() => {
       </div>`;
 
     if (!isClosed) {
-      html += `<button class="btn btn-outline" style="margin-bottom:12px" onclick="ViaticoPage.previewClose()">
+      const yaEditado = v.editado === 1;
+      const montoOriginal = v.monto_asignado - (v.monto_adicional || 0);
+
+      // Botones editar y agregar fondos
+      html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="ViaticoPage.openEdit()"
+          ${yaEditado ? 'disabled style="flex:1;opacity:.5;cursor:not-allowed" title="Ya fue editado"' : ''}>
+          ✏️ ${yaEditado ? 'Ya editado' : 'Editar viático'}
+        </button>
+        <button class="btn btn-outline btn-sm" style="flex:1" onclick="ViaticoPage.openAdicional()">
+          💰 Agregar fondos
+        </button>
+      </div>`;
+
+      // Detalle de monto si hay adicionales
+      if (v.monto_adicional > 0) {
+        html += `<div class="card" style="padding:12px 14px;margin-bottom:10px;background:var(--primary-light);border:1px solid var(--primary-mid)">
+          <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Detalle monto asignado</div>
+          <div style="font-size:13px;display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--muted)">Original:</span><span>${CLP(montoOriginal)}</span></div>
+          <div style="font-size:13px;display:flex;justify-content:space-between;margin-bottom:3px"><span style="color:var(--muted)">Adicional:</span><span style="color:var(--success);font-weight:700">+${CLP(v.monto_adicional)}</span></div>
+          <div style="font-size:14px;font-weight:800;display:flex;justify-content:space-between;padding-top:6px;border-top:1px solid var(--primary-mid)"><span>Total:</span><span>${CLP(v.monto_asignado)}</span></div>
+        </div>`;
+      }
+
+      html += `<button class="btn btn-outline" style="margin-bottom:12px;width:100%" onclick="ViaticoPage.previewClose()">
         👁️ Vista previa / Cerrar viático
       </button>`;
     } else {
@@ -303,6 +359,102 @@ const ViaticoPage = (() => {
     }
   }
 
+  async function openEdit() {
+    const v = _viatico;
+    const [clients, projects, actionTypes] = await Promise.all([
+      API.selectClients(), API.selectProjects(v.client_id), API.selectActionTypes()
+    ]);
+    const allProjects = await API.selectProjects();
+
+    document.getElementById("edit-modal-body").innerHTML = `
+      <div class="form-group">
+        <label>Cliente</label>
+        <select id="edit-client" class="form-control">
+          ${clients.map(c => `<option value="${c.id}" ${c.id===v.client_id?'selected':''}>${c.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Proyecto</label>
+        <select id="edit-project" class="form-control">
+          ${allProjects.map(p => `<option value="${p.id}" ${p.id===v.project_id?'selected':''}>${p.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de acción</label>
+        <select id="edit-action" class="form-control">
+          ${actionTypes.map(a => `<option value="${a.id}" ${a.id===v.action_type_id?'selected':''}>${a.nombre}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Monto asignado ($)</label>
+        <input id="edit-monto" type="number" class="form-control" value="${v.monto_asignado}" min="0">
+      </div>
+      <div class="form-group">
+        <label>Fecha inicio</label>
+        <input id="edit-fecha" type="date" class="form-control" value="${v.fecha_inicio?.substring(0,10)||today()}">
+      </div>
+      <div class="form-group">
+        <label>Observaciones</label>
+        <textarea id="edit-obs" class="form-control" rows="2">${v.observaciones||''}</textarea>
+      </div>
+      <div style="background:var(--warning-light);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:var(--warning)">
+        ⚠️ Esta edición solo puede realizarse <strong>una vez</strong>. Verifica bien los datos antes de guardar.
+      </div>`;
+    document.getElementById("edit-modal").classList.add("open");
+  }
+
+  async function saveEdit() {
+    const data = {
+      client_id:      parseInt(document.getElementById("edit-client")?.value),
+      project_id:     parseInt(document.getElementById("edit-project")?.value),
+      action_type_id: parseInt(document.getElementById("edit-action")?.value),
+      monto_asignado: parseFloat(document.getElementById("edit-monto")?.value),
+      fecha_inicio:   document.getElementById("edit-fecha")?.value + "T12:00:00",
+      observaciones:  document.getElementById("edit-obs")?.value?.trim() || null,
+    };
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const fi = new Date(data.fecha_inicio);
+    if (fi > hoy) return App.toast("La fecha de inicio no puede ser futura");
+    if (!data.monto_asignado || data.monto_asignado <= 0) return App.toast("Ingresa un monto válido");
+
+    const btn = document.getElementById("edit-save-btn");
+    btn.disabled = true;
+    try {
+      await API.editViatico(data);
+      document.getElementById("edit-modal").classList.remove("open");
+      await load();
+      App.toast("Viático actualizado");
+    } catch (err) {
+      App.toast("Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function openAdicional() {
+    document.getElementById("adic-monto").value = "";
+    document.getElementById("adic-motivo").value = "";
+    document.getElementById("adicional-modal").classList.add("open");
+  }
+
+  async function saveAdicional() {
+    const monto = parseFloat(document.getElementById("adic-monto").value);
+    const motivo = document.getElementById("adic-motivo").value.trim();
+    if (!monto || monto <= 0) return App.toast("Ingresa un monto mayor a 0");
+    const btn = document.getElementById("adic-save-btn");
+    btn.disabled = true;
+    try {
+      await API.addAdicional({ monto, motivo: motivo || null });
+      document.getElementById("adicional-modal").classList.remove("open");
+      await load();
+      App.toast(`Fondos agregados: +${CLP(monto)}`);
+    } catch (err) {
+      App.toast("Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function previewClose() {
     const v = _viatico;
     const saldo = v.saldo_actual;
@@ -403,5 +555,5 @@ const ViaticoPage = (() => {
     load();
   }
 
-  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal };
+  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal, openEdit, saveEdit, openAdicional, saveAdicional };
 })();

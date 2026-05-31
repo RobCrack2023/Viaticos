@@ -18,12 +18,14 @@ class Viatico(Base):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     action_type_id = Column(Integer, ForeignKey("action_types.id"), nullable=False)
-    monto_asignado = Column(Float, nullable=False)
-    status = Column(Enum(ViaticoStatus), default=ViaticoStatus.activo)
-    fecha_inicio = Column(DateTime, default=datetime.utcnow)
-    fecha_cierre = Column(DateTime, nullable=True)
-    observaciones = Column(String(500), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    monto_asignado  = Column(Float, nullable=False)
+    monto_adicional = Column(Float, default=0.0)          # acumulado de top-ups
+    editado         = Column(Integer, default=0)           # 0=no editado, 1=ya editado
+    status          = Column(Enum(ViaticoStatus), default=ViaticoStatus.activo)
+    fecha_inicio    = Column(DateTime, default=datetime.utcnow)
+    fecha_cierre    = Column(DateTime, nullable=True)
+    observaciones   = Column(String(500), nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="viaticos")
     client = relationship("Client")

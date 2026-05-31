@@ -10,7 +10,7 @@ from ..models.project import Project
 from ..models.action_type import ActionType
 from ..models.viatico import Viatico, ViaticoMovement, ViaticoStatus
 from ..schemas.viatico import (
-    ViaticoCreate, ViaticoOut, ViaticoClose,
+    ViaticoCreate, ViaticoOut, ViaticoClose, ViaticoEdit, ViaticoAdicional,
     ViaticoMovementCreate, ViaticoMovementUpdate, ViaticoMovementOut,
 )
 from ..schemas.client import ClientOut
@@ -46,7 +46,9 @@ def _build_out(v: Viatico) -> ViaticoOut:
         "client_nombre": v.client.nombre if v.client else "",
         "project_nombre": v.project.nombre if v.project else "",
         "action_type_nombre": v.action_type.nombre if v.action_type else "",
-        "monto_asignado": v.monto_asignado,
+        "monto_asignado":  v.monto_asignado,
+        "monto_adicional": v.monto_adicional or 0.0,
+        "editado":         v.editado or 0,
         "status": v.status,
         "fecha_inicio": v.fecha_inicio,
         "fecha_cierre": v.fecha_cierre,
@@ -123,6 +125,55 @@ def get_active_viatico(db: Session = Depends(get_db), current_user: User = Depen
 def list_viaticos(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     viaticos = db.query(Viatico).filter(Viatico.user_id == current_user.id).order_by(Viatico.fecha_inicio.desc()).all()
     return [_build_out(v) for v in viaticos]
+
+
+@router.put("/active/edit", response_model=ViaticoOut)
+def edit_viatico(data: ViaticoEdit, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    v = _active_viatico(current_user, db)
+    if v.editado:
+        raise HTTPException(status_code=400, detail="El viático ya fue editado anteriormente. Solo se permite una edición.")
+    # Validar referencias si se cambian
+    if data.client_id:
+        if not db.query(Client).filter(Client.id == data.client_id).first():
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        v.client_id = data.client_id
+    if data.project_id:
+        if not db.query(Project).filter(Project.id == data.project_id).first():
+            raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+        v.project_id = data.project_id
+    if data.action_type_id:
+        if not db.query(ActionType).filter(ActionType.id == data.action_type_id).first():
+            raise HTTPException(status_code=404, detail="Tipo de acción no encontrado")
+        v.action_type_id = data.action_type_id
+    if data.fecha_inicio:
+        if data.fecha_inicio.date() > datetime.utcnow().date():
+            raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser futura")
+        v.fecha_inicio = data.fecha_inicio
+    if data.monto_asignado is not None:
+        total_gastado = sum(m.monto for m in v.movements)
+        if data.monto_asignado < total_gastado:
+            raise HTTPException(status_code=400, detail=f"El monto no puede ser menor a lo ya gastado ({total_gastado:,.0f})")
+        v.monto_asignado = data.monto_asignado
+    if data.observaciones is not None:
+        v.observaciones = data.observaciones
+    v.editado = 1
+    db.commit()
+    db.refresh(v)
+    return _build_out(v)
+
+
+@router.post("/active/adicional", response_model=ViaticoOut)
+def add_adicional(data: ViaticoAdicional, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if data.monto <= 0:
+        raise HTTPException(status_code=400, detail="El monto adicional debe ser mayor a cero")
+    v = _active_viatico(current_user, db)
+    v.monto_asignado  += data.monto
+    v.monto_adicional  = (v.monto_adicional or 0) + data.monto
+    if data.motivo:
+        v.observaciones = (v.observaciones or "") + f"\n[Adicional ${data.monto:,.0f}: {data.motivo}]"
+    db.commit()
+    db.refresh(v)
+    return _build_out(v)
 
 
 @router.post("/active/close", response_model=ViaticoOut)

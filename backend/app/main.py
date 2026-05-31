@@ -36,6 +36,23 @@ if os.path.exists(frontend_path):
 
 
 @app.on_event("startup")
+def migrate_db():
+    """Agrega columnas nuevas sin borrar datos existentes (SQLite safe)."""
+    from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE viaticos ADD COLUMN monto_adicional FLOAT DEFAULT 0.0",
+        "ALTER TABLE viaticos ADD COLUMN editado INTEGER DEFAULT 0",
+    ]
+    with engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # Columna ya existe — ignorar
+
+
+@app.on_event("startup")
 def create_default_admin():
     db = Session(engine)
     try:
