@@ -8,8 +8,9 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, HRFlowable, KeepTogether
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from PIL import Image as PILImage
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from ..database import get_db
@@ -141,6 +142,40 @@ def download_pdf(viatico_id: int, db: Session = Depends(get_db), current_user: U
     ]))
     story.append(resumen_table)
 
+    # ── Sección de fotos de comprobantes ────────────────────────────────────────
+    movs_con_foto = [(i, m) for i, m in enumerate(v.movements, 1) if m.foto_path]
+    if movs_con_foto:
+        story.append(Spacer(1, 0.8*cm))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB")))
+        story.append(Spacer(1, 0.4*cm))
+        story.append(Paragraph("COMPROBANTES FOTOGRÁFICOS", ParagraphStyle("h2foto", parent=styles["Heading2"], fontSize=11, spaceAfter=8)))
+
+        MAX_W = 15 * cm
+        MAX_H = 10 * cm
+
+        for i, m in movs_con_foto:
+            foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+            if not os.path.exists(foto_abs):
+                continue
+            try:
+                # Calcular dimensiones proporcionales con Pillow
+                with PILImage.open(foto_abs) as pil:
+                    pw, ph = pil.size
+                ratio = min(MAX_W / pw, MAX_H / ph)
+                img_w, img_h = pw * ratio, ph * ratio
+
+                label = ParagraphStyle("foto_label", parent=styles["Normal"], fontSize=9,
+                                       textColor=colors.HexColor("#6B7280"), spaceBefore=4, spaceAfter=4)
+                bloque = [
+                    Paragraph(f"<b>#{i}</b> — {m.tipo.upper()} | {m.concepto} | {m.fecha.strftime('%d/%m/%Y')} | {CLP(m.monto)}", label),
+                    Image(foto_abs, width=img_w, height=img_h),
+                    Spacer(1, 0.5*cm),
+                ]
+                story.append(KeepTogether(bloque))
+            except Exception:
+                story.append(Paragraph(f"#{i} — {m.concepto}: imagen no disponible",
+                                       ParagraphStyle("err", parent=styles["Normal"], fontSize=8, textColor=colors.grey)))
+
     doc.build(story)
     buf.seek(0)
     filename = f"rendicion_viatico_{viatico_id}_{datetime.now().strftime('%Y%m%d')}.pdf"
@@ -239,6 +274,54 @@ def download_excel(viatico_id: int, db: Session = Depends(get_db), current_user:
             color = "16A34A" if saldo >= 0 else "DC2626"
             ws[f"D{r}"].font = Font(bold=True, color=color, size=10)
             ws[f"E{r}"].font = Font(bold=True, color=color, size=10)
+
+    # ── Hoja 2: Fotos de comprobantes ─────────────────────────────────────────
+    movs_con_foto = [(i, m) for i, m in enumerate(v.movements, 1) if m.foto_path]
+    if movs_con_foto:
+        from openpyxl.drawing.image import Image as XLImage
+        ws2 = wb.create_sheet("Comprobantes")
+        ws2.column_dimensions["A"].width = 6
+        ws2.column_dimensions["B"].width = 60
+
+        ws2["A1"] = "COMPROBANTES FOTOGRÁFICOS"
+        ws2["A1"].font = Font(bold=True, size=13, color=blue)
+        ws2.merge_cells("A1:B1")
+        ws2.row_dimensions[1].height = 22
+
+        cur_row = 3
+        for i, m in movs_con_foto:
+            foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+            if not os.path.exists(foto_abs):
+                continue
+            try:
+                # Etiqueta del movimiento
+                ws2[f"A{cur_row}"] = f"#{i}"
+                ws2[f"A{cur_row}"].font = Font(bold=True, size=10, color=blue)
+                ws2[f"B{cur_row}"] = f"{m.tipo.upper()} | {m.concepto} | {m.fecha.strftime('%d/%m/%Y')} | ${m.monto:,.0f}"
+                ws2[f"B{cur_row}"].font = Font(size=10)
+                cur_row += 1
+
+                # Calcular tamaño de imagen (max 500px de ancho)
+                with PILImage.open(foto_abs) as pil:
+                    pw, ph = pil.size
+                max_px = 500
+                ratio = min(max_px / pw, max_px / ph, 1)
+                img_w = int(pw * ratio)
+                img_h = int(ph * ratio)
+
+                xl_img = XLImage(foto_abs)
+                xl_img.width  = img_w
+                xl_img.height = img_h
+                ws2.add_image(xl_img, f"B{cur_row}")
+
+                # Ajustar altura de filas para la imagen
+                rows_needed = max(1, img_h // 15)
+                for r in range(cur_row, cur_row + rows_needed):
+                    ws2.row_dimensions[r].height = 15
+                cur_row += rows_needed + 2
+            except Exception:
+                ws2[f"B{cur_row}"] = f"#{i} — imagen no disponible"
+                cur_row += 2
 
     buf = BytesIO()
     wb.save(buf)
