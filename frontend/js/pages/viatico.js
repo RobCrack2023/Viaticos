@@ -8,7 +8,10 @@ const ViaticoPage = (() => {
       <div class="topbar">
         <button class="back-btn" onclick="App.navigate('dashboard')">‹</button>
         <h1>Viático</h1>
-        <button class="menu-btn" id="viat-add-btn" style="display:none" title="Agregar">＋</button>
+        <div style="display:flex;gap:6px">
+          <button class="menu-btn" id="viat-add-btn" style="display:none" title="Agregar">＋</button>
+          <button class="menu-btn" id="viat-logout-btn" style="font-size:13px;font-weight:700">Salir</button>
+        </div>
       </div>
       <div class="content" id="viat-content">
         <div style="text-align:center;padding:40px;color:var(--muted)">Cargando...</div>
@@ -537,6 +540,7 @@ const ViaticoPage = (() => {
   }
 
   function bind() {
+    document.getElementById("viat-logout-btn")?.addEventListener("click", () => App.logout());
     document.getElementById("viat-add-btn")?.addEventListener("click", () => openModal());
     document.getElementById("vmv-foto-input")?.addEventListener("change", (e) => {
       const file = e.target.files[0];
