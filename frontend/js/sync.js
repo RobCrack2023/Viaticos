@@ -6,7 +6,7 @@ const Sync = (() => {
     let synced = 0;
     for (const op of ops) {
       try {
-        await fetch("/api" + op.path, {
+        const res = await fetch("/api" + op.path, {
           method: op.method,
           headers: {
             "Content-Type": "application/json",
@@ -14,14 +14,19 @@ const Sync = (() => {
           },
           body: op.body ? JSON.stringify(op.body) : undefined,
         });
-        await DB.clearOp(op.id);
-        synced++;
+        if (res.ok || res.status === 204) {
+          await DB.clearOp(op.id);
+          synced++;
+        }
       } catch (_) {
-        break; // Si falla uno, detenemos (aún offline)
+        break; // Si falla uno, aún offline — detener
       }
     }
     if (synced > 0) {
-      App.toast(`✓ ${synced} operación(es) sincronizada(s)`);
+      // Limpiar caché para forzar datos frescos del servidor
+      await DB.saveCache("account", null);
+      await DB.saveCache("viatico_active", null);
+      App.toast(`Sincronizado: ${synced} operación(es) enviada(s)`);
       App.refreshCurrentPage();
     }
   }

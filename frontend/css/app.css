@@ -551,6 +551,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 /* ── Divider ── */
 .divider { border: none; border-top: 1px solid var(--border); margin: 4px 0 16px; }
 
+/* ── Movimiento pendiente offline ── */
+.mv-item.pending { opacity: .7; }
+.mv-item.pending .mv-concepto::after {
+  content: ' ⏳';
+  font-size: 11px;
+  color: var(--warning);
+}
+
 @media (min-width: 480px) {
   .content { max-width: 480px; margin: 0 auto; }
   .bottom-nav { max-width: 480px; left: 50%; transform: translateX(-50%); border-left: 1px solid var(--border); border-right: 1px solid var(--border); }

@@ -254,13 +254,31 @@ const ViaticoPage = (() => {
       } else {
         mv = await API.addViaticoMovement(data);
       }
+
+      // Actualización optimista si quedó en cola offline
+      if (mv?.__queued) {
+        const cached = await DB.getCache("viatico_active") || _viatico;
+        if (cached) {
+          const fakeMv = { id: Date.now(), ...data, fecha: data.fecha || new Date().toISOString(), created_at: new Date().toISOString(), foto_path: null, __pending: true };
+          cached.movements = [...(cached.movements || []), fakeMv];
+          cached.total_gastos = (cached.total_gastos || 0) + monto;
+          cached.saldo_actual = cached.monto_asignado - cached.total_gastos;
+          await DB.saveCache("viatico_active", cached);
+          _viatico = cached;
+        }
+        closeModal();
+        renderActive();
+        App.toast("⏳ Sin conexión — guardado localmente, se sincronizará");
+        return;
+      }
+
       const fotoInput = document.getElementById("vmv-foto-input");
-      if (fotoInput.files[0]) {
+      if (fotoInput.files[0] && mv?.id) {
         await API.uploadFotoViatico(mv.id, fotoInput.files[0]);
       }
       closeModal();
       await load();
-      App.toast("✓ Guardado");
+      App.toast("Guardado");
     } catch (err) {
       App.toast("Error: " + err.message);
     } finally {

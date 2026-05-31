@@ -203,14 +203,32 @@ const AccountPage = (() => {
       } else {
         mv = await API.addMovement(data);
       }
-      // Subir foto si hay
+
+      // Si quedó en cola offline — actualizar caché local y UI optimistamente
+      if (mv?.__queued) {
+        const cached = await DB.getCache("account") || _account;
+        if (cached) {
+          const fakeMv = { id: Date.now(), ...data, fecha: data.fecha || new Date().toISOString(), created_at: new Date().toISOString(), foto_path: null, __pending: true };
+          cached.movements = [...(cached.movements || []), fakeMv];
+          // Recalcular saldo
+          cached.saldo_actual = cached.saldo_inicial + cached.movements.reduce((s, m) => m.tipo === "ingreso" ? s + m.monto : s - m.monto, 0);
+          await DB.saveCache("account", cached);
+          _account = cached;
+        }
+        closeModal();
+        renderContent();
+        App.toast("⏳ Sin conexión — guardado localmente, se sincronizará");
+        return;
+      }
+
+      // Subir foto si hay (solo con conexión)
       const fotoInput = document.getElementById("mv-foto-input");
-      if (fotoInput.files[0]) {
+      if (fotoInput.files[0] && mv?.id) {
         await API.uploadFotoMovement(mv.id, fotoInput.files[0]);
       }
       closeModal();
       await load();
-      App.toast("✓ Movimiento guardado");
+      App.toast("Movimiento guardado");
     } catch (err) {
       App.toast("Error: " + err.message);
     } finally {
