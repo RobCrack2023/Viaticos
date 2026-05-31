@@ -46,6 +46,59 @@ def _build_viatico_out(v: Viatico) -> dict:
     }
 
 
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    viaticos = db.query(Viatico).all()
+
+    by_user, by_project, by_action = {}, {}, {}
+
+    for v in viaticos:
+        gastos = sum(m.monto for m in v.movements)
+        is_closed = v.status.value == "cerrado"
+
+        # Por usuario
+        uid = v.user_id
+        if uid not in by_user:
+            by_user[uid] = {"nombre": v.user.nombre if v.user else "?", "total": 0, "activos": 0, "cerrados": 0, "asignado": 0.0, "gastado": 0.0}
+        by_user[uid]["total"] += 1
+        by_user[uid]["activos" if not is_closed else "cerrados"] += 1
+        by_user[uid]["asignado"] += v.monto_asignado
+        by_user[uid]["gastado"] += gastos
+
+        # Por proyecto
+        pid = v.project_id
+        if pid not in by_project:
+            by_project[pid] = {"nombre": v.project.nombre if v.project else "?", "cliente": v.client.nombre if v.client else "?", "total": 0, "asignado": 0.0, "gastado": 0.0}
+        by_project[pid]["total"] += 1
+        by_project[pid]["asignado"] += v.monto_asignado
+        by_project[pid]["gastado"] += gastos
+
+        # Por tipo de acción
+        aid = v.action_type_id
+        if aid not in by_action:
+            by_action[aid] = {"nombre": v.action_type.nombre if v.action_type else "?", "total": 0, "asignado": 0.0, "gastado": 0.0}
+        by_action[aid]["total"] += 1
+        by_action[aid]["asignado"] += v.monto_asignado
+        by_action[aid]["gastado"] += gastos
+
+    total_asignado = sum(v.monto_asignado for v in viaticos)
+    total_gastado  = sum(sum(m.monto for m in v.movements) for v in viaticos)
+
+    return {
+        "resumen": {
+            "total":          len(viaticos),
+            "activos":        sum(1 for v in viaticos if v.status.value == "activo"),
+            "cerrados":       sum(1 for v in viaticos if v.status.value == "cerrado"),
+            "total_asignado": total_asignado,
+            "total_gastado":  total_gastado,
+            "total_saldo":    total_asignado - total_gastado,
+        },
+        "por_usuario":     sorted(by_user.values(),    key=lambda x: x["gastado"], reverse=True),
+        "por_proyecto":    sorted(by_project.values(), key=lambda x: x["gastado"], reverse=True),
+        "por_tipo_accion": sorted(by_action.values(),  key=lambda x: x["gastado"], reverse=True),
+    }
+
+
 @router.delete("/viaticos/{viatico_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_viatico(viatico_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     v = db.query(Viatico).filter(Viatico.id == viatico_id).first()

@@ -121,6 +121,7 @@ const API = (() => {
     excelUrl: (id) => `${BASE}/reports/${id}/excel`,
 
     // Admin
+    getStats:         () => req("GET", "/admin/stats"),
     listAllViaticos:  (status) => req("GET", `/admin/viaticos${status ? `?status_filter=${status}` : ""}`),
     deleteViatico:    (id) => req("DELETE", `/admin/viaticos/${id}`),
     listUsers:        () => req("GET",  "/admin/users"),
