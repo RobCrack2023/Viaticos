@@ -349,8 +349,9 @@ const ViaticoPage = (() => {
       }
 
       const fotoInput = document.getElementById("vmv-foto-input");
-      if (fotoInput.files[0] && mv?.id) {
-        await API.uploadFotoViatico(mv.id, fotoInput.files[0]);
+      const fotoFile = fotoInput._scannedFile || fotoInput.files[0];
+      if (fotoFile && mv?.id) {
+        await API.uploadFotoViatico(mv.id, fotoFile);
       }
       closeModal();
       await load();
@@ -545,13 +546,12 @@ const ViaticoPage = (() => {
     document.getElementById("vmv-foto-input")?.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (r) => {
+      Scanner.showUI(file, (enhancedFile, previewUrl) => {
+        document.getElementById("vmv-foto-input")._scannedFile = enhancedFile;
         const img = document.getElementById("vmv-foto-preview");
-        img.src = r.target.result;
+        img.src = previewUrl;
         img.style.display = "block";
-      };
-      reader.readAsDataURL(file);
+      });
     });
     document.getElementById("vmv-modal")?.addEventListener("click", (e) => {
       if (e.target === document.getElementById("vmv-modal")) closeModal();

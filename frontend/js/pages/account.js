@@ -233,8 +233,9 @@ const AccountPage = (() => {
 
       // Subir foto si hay (solo con conexión)
       const fotoInput = document.getElementById("mv-foto-input");
-      if (fotoInput.files[0] && mv?.id) {
-        await API.uploadFotoMovement(mv.id, fotoInput.files[0]);
+      const fotoFile = fotoInput._scannedFile || fotoInput.files[0];
+      if (fotoFile && mv?.id) {
+        await API.uploadFotoMovement(mv.id, fotoFile);
       }
       closeModal();
       await load();
@@ -316,13 +317,14 @@ const AccountPage = (() => {
     document.getElementById("mv-foto-input")?.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (r) => {
+      // Abrir scanner para mejorar la foto
+      Scanner.showUI(file, (enhancedFile, previewUrl) => {
+        // Guardar archivo mejorado en el input de forma accesible
+        document.getElementById("mv-foto-input")._scannedFile = enhancedFile;
         const img = document.getElementById("mv-foto-preview");
-        img.src = r.target.result;
+        img.src = previewUrl;
         img.style.display = "block";
-      };
-      reader.readAsDataURL(file);
+      });
     });
     document.getElementById("mv-modal")?.addEventListener("click", (e) => {
       if (e.target === document.getElementById("mv-modal")) closeModal();
