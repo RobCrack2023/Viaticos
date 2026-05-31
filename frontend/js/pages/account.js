@@ -191,7 +191,8 @@ const AccountPage = (() => {
     const concepto = document.getElementById("mv-concepto").value.trim();
     const monto = parseFloat(document.getElementById("mv-monto").value);
     const fecha = document.getElementById("mv-fecha").value;
-    if (!concepto || !monto) return App.toast("Completa todos los campos");
+    if (!concepto || concepto.length < 2) return App.toast("Ingresa un concepto válido (mínimo 2 caracteres)");
+    if (!monto || monto <= 0) return App.toast("Ingresa un monto válido mayor a 0");
 
     const btn = document.getElementById("mv-save-btn");
     btn.disabled = true;

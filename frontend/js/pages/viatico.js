@@ -248,7 +248,8 @@ const ViaticoPage = (() => {
     const concepto = document.getElementById("vmv-concepto").value.trim();
     const monto = parseFloat(document.getElementById("vmv-monto").value);
     const fecha = document.getElementById("vmv-fecha").value;
-    if (!concepto || !monto) return App.toast("Completa todos los campos");
+    if (!concepto || concepto.length < 2) return App.toast("Ingresa un concepto válido (mínimo 2 caracteres)");
+    if (!monto || monto <= 0) return App.toast("Ingresa un monto válido mayor a 0");
 
     const btn = document.getElementById("vmv-save-btn");
     btn.disabled = true;

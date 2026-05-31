@@ -27,12 +27,29 @@ const App = (() => {
 
   let _currentPage = null;
 
-  function navigate(pageName) {
+  async function navigate(pageName) {
     const def = pages[pageName];
     if (!def) return;
 
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     if (def.adminOnly && !user.is_admin) return;
+
+    // Usuario normal sin viático: "Inicio" redirige a viático
+    if (pageName === 'dashboard' && !user.is_admin) {
+      try {
+        const v = await API.getActiveViatico();
+        if (!v) { _doNavigate('viatico', user); return; }
+      } catch (_) {
+        _doNavigate('viatico', user); return;
+      }
+    }
+
+    _doNavigate(pageName, user);
+  }
+
+  function _doNavigate(pageName, user) {
+    const def = pages[pageName];
+    if (!def) return;
 
     const shell = document.getElementById("app-shell");
     const mod = def.module();
@@ -118,7 +135,10 @@ const App = (() => {
   }
 
   function refreshCurrentPage() {
-    if (_currentPage) navigate(_currentPage);
+    if (_currentPage) {
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      _doNavigate(_currentPage, user);
+    }
   }
 
   // Descarga un archivo con JWT — los <a href> no envían Authorization header

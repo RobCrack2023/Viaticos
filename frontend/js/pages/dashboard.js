@@ -127,7 +127,7 @@ const DashboardPage = (() => {
     return `<li class="mv-item">
       <div class="mv-icon ${m.tipo}">${icons[m.tipo] || '📄'}</div>
       <div class="mv-info">
-        <div class="mv-concepto">${m.concepto}</div>
+        <div class="mv-concepto">${m.concepto?.trim() || '(sin concepto)'}</div>
         <div class="mv-fecha">${fmtDate(m.fecha)}</div>
       </div>
       <div class="mv-monto ${isPos ? 'pos' : 'neg'}">${isPos ? '+' : '-'}${CLP(m.monto)}</div>
