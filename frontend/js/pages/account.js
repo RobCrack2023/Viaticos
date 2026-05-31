@@ -81,14 +81,14 @@ const AccountPage = (() => {
   async function load() {
     try {
       _account = await API.getAccount();
+      if (!_account) {
+        renderInit();
+        return;
+      }
       renderContent();
     } catch (err) {
-      if (err.message.includes("no inicializada")) {
-        renderInit();
-      } else {
-        document.getElementById("acc-content").innerHTML =
-          `<div class="empty-state"><div class="icon">⚠️</div><p>${err.message}</p></div>`;
-      }
+      document.getElementById("acc-content").innerHTML =
+        `<div class="empty-state"><div class="icon">⚠️</div><p>${err.message}</p></div>`;
     }
   }
 
