@@ -85,9 +85,19 @@ const AdminViaticoPage = (() => {
               onclick="App.downloadFile('/api/reports/${v.id}/excel','rendicion_viatico_${v.id}.xlsx')">
               📊 Excel
             </button>
+            <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1.5px solid #FECACA"
+              onclick="AdminViaticoPage.confirmDelete(${v.id},'${(v.user_nombre + ' - ' + v.project_nombre).replace(/'/g,'')}')">
+              🗑️
+            </button>
           </div>` : `
-          <div style="font-size:13px;color:var(--muted);margin-top:6px">
-            Saldo restante: <strong style="color:${v.saldo_actual>=0?'var(--success)':'var(--danger)'}">${CLP(v.saldo_actual)}</strong>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+            <div style="font-size:13px;color:var(--muted)">
+              Saldo restante: <strong style="color:${v.saldo_actual>=0?'var(--success)':'var(--danger)'}">${CLP(v.saldo_actual)}</strong>
+            </div>
+            <button class="btn btn-sm" style="background:var(--danger-light);color:var(--danger);border:1.5px solid #FECACA"
+              onclick="AdminViaticoPage.confirmDelete(${v.id},'${(v.user_nombre + ' - ' + v.project_nombre).replace(/'/g,'')}')">
+              🗑️ Eliminar
+            </button>
           </div>`}
 
           <!-- Detalle gastos colapsable -->
@@ -115,6 +125,21 @@ const AdminViaticoPage = (() => {
     el.innerHTML = html;
   }
 
+  async function confirmDelete(id, nombre) {
+    // Primera confirmación
+    if (!confirm(`¿Eliminar el viático de "${nombre}"?\n\nEsta acción eliminará todos los movimientos y fotos. No se puede deshacer.`)) return;
+    // Segunda confirmación (doble seguridad)
+    if (!confirm(`CONFIRMACIÓN FINAL\n\n¿Seguro que deseas eliminar permanentemente el viático de "${nombre}"?`)) return;
+
+    try {
+      await API.deleteViatico(id);
+      App.toast("Viático eliminado correctamente");
+      await load();
+    } catch (err) {
+      App.toast("Error: " + err.message);
+    }
+  }
+
   async function setFilter(filter, el) {
     _filter = filter;
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -129,5 +154,5 @@ const AdminViaticoPage = (() => {
     load();
   }
 
-  return { render, bind, setFilter };
+  return { render, bind, setFilter, confirmDelete };
 })();

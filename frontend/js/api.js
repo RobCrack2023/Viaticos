@@ -122,6 +122,7 @@ const API = (() => {
 
     // Admin
     listAllViaticos:  (status) => req("GET", `/admin/viaticos${status ? `?status_filter=${status}` : ""}`),
+    deleteViatico:    (id) => req("DELETE", `/admin/viaticos/${id}`),
     listUsers:        () => req("GET",  "/admin/users"),
     createUser:       (data) => req("POST", "/admin/users", data),
     updateUser:       (id, data) => req("PUT", `/admin/users/${id}`, data),

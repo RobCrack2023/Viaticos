@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import os
 from ..database import get_db
 from ..models.user import User
 from ..models.client import Client
 from ..models.project import Project
 from ..models.action_type import ActionType
+from ..core.config import settings
 from ..models.viatico import Viatico, ViaticoMovement
 from ..schemas.user import UserCreate, UserUpdate, UserOut
 from ..schemas.client import ClientCreate, ClientUpdate, ClientOut
@@ -42,6 +44,31 @@ def _build_viatico_out(v: Viatico) -> dict:
         "total_gastos": total,
         "movements": v.movements,
     }
+
+
+@router.delete("/viaticos/{viatico_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_viatico(viatico_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    v = db.query(Viatico).filter(Viatico.id == viatico_id).first()
+    if not v:
+        raise HTTPException(status_code=404, detail="Viático no encontrado")
+
+    # 1. Eliminar fotos del sistema de archivos
+    for m in v.movements:
+        if m.foto_path:
+            foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+            try:
+                if os.path.exists(foto_abs):
+                    os.remove(foto_abs)
+            except Exception:
+                pass  # Si falla la eliminación del archivo, continuar igual
+
+    # 2. Eliminar movimientos del viático
+    for m in v.movements:
+        db.delete(m)
+
+    # 3. Eliminar el viático
+    db.delete(v)
+    db.commit()
 
 
 @router.get("/viaticos")
