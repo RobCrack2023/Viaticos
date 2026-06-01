@@ -24,10 +24,11 @@ class AccountMovement(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     tipo = Column(String(20), nullable=False)  # giro, compra, ingreso
     concepto = Column(String(200), nullable=False)
-    monto = Column(Float, nullable=False)
-    foto_path = Column(String(300), nullable=True)
-    fecha = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    monto        = Column(Float, nullable=False)
+    numero_doc   = Column(String(50), nullable=True)
+    foto_path    = Column(String(300), nullable=True)
+    fecha        = Column(DateTime, default=datetime.utcnow)
+    created_at   = Column(DateTime, default=datetime.utcnow)
     sync_pending = Column(Integer, default=0)  # 1 = pendiente sync offline
 
     account = relationship("Account", back_populates="movements")

@@ -12,27 +12,37 @@ class ViaticoCreate(BaseModel):
     observaciones: Optional[str] = None
 
 
+CATEGORIAS = ["Hotel/Alojamiento", "Alimentacion", "Transporte",
+              "Combustible", "Peajes", "Materiales", "Comunicaciones", "Otros"]
+
+
 class ViaticoMovementCreate(BaseModel):
-    tipo: str  # giro, gasto
-    concepto: str
-    monto: float
-    fecha: Optional[datetime] = None
+    tipo:       str
+    concepto:   str
+    monto:      float
+    categoria:  str = "Otros"
+    numero_doc: Optional[str] = None
+    fecha:      Optional[datetime] = None
 
 
 class ViaticoMovementUpdate(BaseModel):
-    tipo: Optional[str] = None
-    concepto: Optional[str] = None
-    monto: Optional[float] = None
-    fecha: Optional[datetime] = None
+    tipo:       Optional[str]   = None
+    concepto:   Optional[str]   = None
+    monto:      Optional[float] = None
+    categoria:  Optional[str]   = None
+    numero_doc: Optional[str]   = None
+    fecha:      Optional[datetime] = None
 
 
 class ViaticoMovementOut(BaseModel):
-    id: int
-    tipo: str
-    concepto: str
-    monto: float
-    foto_path: Optional[str]
-    fecha: datetime
+    id:         int
+    tipo:       str
+    concepto:   str
+    monto:      float
+    categoria:  str = "Otros"
+    numero_doc: Optional[str] = None
+    foto_path:  Optional[str] = None
+    fecha:      datetime
     created_at: datetime
 
     model_config = {"from_attributes": True}

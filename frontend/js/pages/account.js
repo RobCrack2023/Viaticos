@@ -37,6 +37,10 @@ const AccountPage = (() => {
             <input id="mv-monto" type="number" class="form-control" placeholder="0" min="0" step="1">
           </div>
           <div class="form-group">
+            <label>N° Boleta / Factura (opcional)</label>
+            <input id="mv-numero-doc" type="text" class="form-control" placeholder="Ej: 001234">
+          </div>
+          <div class="form-group">
             <label>Fecha</label>
             <input id="mv-fecha" type="date" class="form-control">
           </div>
@@ -139,6 +143,12 @@ const AccountPage = (() => {
 
       <div class="section-header">
         <span class="section-title">Movimientos</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm"
+            onclick="App.downloadFile('/api/reports/account/pdf','cuenta_corriente.pdf')">📄 PDF</button>
+          <button class="btn btn-outline btn-sm"
+            onclick="App.downloadFile('/api/reports/account/excel','cuenta_corriente.xlsx')">📊 Excel</button>
+        </div>
       </div>`;
 
     if (!movs.length) {
@@ -153,6 +163,7 @@ const AccountPage = (() => {
           <div class="mv-info">
             <div class="mv-concepto">${m.concepto}</div>
             <div class="mv-fecha">${fmtDate(m.fecha)}</div>
+            ${m.numero_doc ? `<div style="font-size:11px;color:var(--muted)">N° ${m.numero_doc}</div>` : ''}
             ${m.foto_path ? `<div style="font-size:11px;color:var(--primary);margin-top:2px">📎 foto adjunta</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -176,6 +187,7 @@ const AccountPage = (() => {
     document.getElementById("mv-tipo").value = mv?.tipo || "ingreso";
     document.getElementById("mv-concepto").value = mv?.concepto || "";
     document.getElementById("mv-monto").value = mv?.monto || "";
+    document.getElementById("mv-numero-doc").value = mv?.numero_doc || "";
     document.getElementById("mv-fecha").value = mv ? mv.fecha.substring(0, 10) : today();
     document.getElementById("mv-foto-preview").style.display = "none";
     document.getElementById("mv-modal").classList.add("open");
@@ -197,7 +209,8 @@ const AccountPage = (() => {
     const btn = document.getElementById("mv-save-btn");
     btn.disabled = true;
     try {
-      const data = { tipo, concepto, monto, fecha: fecha ? fecha + "T12:00:00" : undefined };
+      const numero_doc = document.getElementById("mv-numero-doc").value.trim() || null;
+      const data = { tipo, concepto, monto, numero_doc, fecha: fecha ? fecha + "T12:00:00" : undefined };
       let mv;
       if (_editId) {
         mv = await API.updateMovement(_editId, data);

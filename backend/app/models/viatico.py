@@ -41,10 +41,12 @@ class ViaticoMovement(Base):
     viatico_id = Column(Integer, ForeignKey("viaticos.id"), nullable=False)
     tipo = Column(String(20), nullable=False)  # giro, gasto
     concepto = Column(String(200), nullable=False)
-    monto = Column(Float, nullable=False)
-    foto_path = Column(String(300), nullable=True)
-    fecha = Column(DateTime, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    monto        = Column(Float, nullable=False)
+    categoria    = Column(String(50), default="Otros")
+    numero_doc   = Column(String(50), nullable=True)
+    foto_path    = Column(String(300), nullable=True)
+    fecha        = Column(DateTime, default=datetime.utcnow)
+    created_at   = Column(DateTime, default=datetime.utcnow)
     sync_pending = Column(Integer, default=0)
 
     viatico = relationship("Viatico", back_populates="movements")

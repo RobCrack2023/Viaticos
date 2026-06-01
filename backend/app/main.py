@@ -42,6 +42,9 @@ def migrate_db():
     migrations = [
         "ALTER TABLE viaticos ADD COLUMN monto_adicional FLOAT DEFAULT 0.0",
         "ALTER TABLE viaticos ADD COLUMN editado INTEGER DEFAULT 0",
+        "ALTER TABLE viatico_movements ADD COLUMN categoria VARCHAR(50) DEFAULT 'Otros'",
+        "ALTER TABLE viatico_movements ADD COLUMN numero_doc VARCHAR(50)",
+        "ALTER TABLE account_movements ADD COLUMN numero_doc VARCHAR(50)",
     ]
     with engine.connect() as conn:
         for sql in migrations:

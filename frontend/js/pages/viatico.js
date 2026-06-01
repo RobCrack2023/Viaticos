@@ -10,6 +10,8 @@ const ViaticoPage = (() => {
         <h1>Viático</h1>
         <div style="display:flex;gap:6px">
           <button class="menu-btn" id="viat-add-btn" style="display:none" title="Agregar">＋</button>
+          <button class="menu-btn" id="viat-hist-btn" title="Historial" style="font-size:16px">📋</button>
+          <button class="menu-btn" id="viat-pwd-btn"  title="Cambiar clave" style="font-size:16px">🔑</button>
           <button class="menu-btn" id="viat-logout-btn" style="font-size:13px;font-weight:700">Salir</button>
         </div>
       </div>
@@ -32,8 +34,25 @@ const ViaticoPage = (() => {
             </select>
           </div>
           <div class="form-group">
+            <label>Categoria</label>
+            <select id="vmv-categoria" class="form-control">
+              <option>Hotel/Alojamiento</option>
+              <option>Alimentacion</option>
+              <option>Transporte</option>
+              <option>Combustible</option>
+              <option>Peajes</option>
+              <option>Materiales</option>
+              <option>Comunicaciones</option>
+              <option selected>Otros</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label>Concepto</label>
             <input id="vmv-concepto" type="text" class="form-control" placeholder="Ej: Hotel, Comida, Taxi...">
+          </div>
+          <div class="form-group">
+            <label>N° Boleta / Factura (opcional)</label>
+            <input id="vmv-numero-doc" type="text" class="form-control" placeholder="Ej: 001234">
           </div>
           <div class="form-group">
             <label>Monto ($)</label>
@@ -81,6 +100,40 @@ const ViaticoPage = (() => {
             <input id="adic-motivo" type="text" class="form-control" placeholder="Ej: Extensión del proyecto">
           </div>
           <button class="btn btn-primary" id="adic-save-btn" onclick="ViaticoPage.saveAdicional()">Agregar fondos</button>
+        </div>
+      </div>
+
+      <!-- Modal cambio de contraseña -->
+      <div class="modal-overlay" id="pwd-modal">
+        <div class="modal">
+          <div class="modal-title">
+            <span>Cambiar contraseña</span>
+            <button class="modal-close" onclick="document.getElementById('pwd-modal').classList.remove('open')">✕</button>
+          </div>
+          <div class="form-group">
+            <label>Contraseña actual</label>
+            <input id="pwd-current" type="password" class="form-control" placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label>Nueva contraseña</label>
+            <input id="pwd-new" type="password" class="form-control" placeholder="Minimo 6 caracteres">
+          </div>
+          <div class="form-group">
+            <label>Repetir nueva contraseña</label>
+            <input id="pwd-repeat" type="password" class="form-control" placeholder="••••••••">
+          </div>
+          <button class="btn btn-primary" id="pwd-save-btn" onclick="ViaticoPage.savePassword()">Cambiar contraseña</button>
+        </div>
+      </div>
+
+      <!-- Modal historial de viaticos -->
+      <div class="modal-overlay" id="hist-modal">
+        <div class="modal">
+          <div class="modal-title">
+            <span>Mis viáticos anteriores</span>
+            <button class="modal-close" onclick="document.getElementById('hist-modal').classList.remove('open')">✕</button>
+          </div>
+          <div id="hist-content" style="text-align:center;padding:20px;color:var(--muted)">Cargando...</div>
         </div>
       </div>
 
@@ -260,7 +313,8 @@ const ViaticoPage = (() => {
           <div class="mv-icon ${m.tipo}">${icons[m.tipo] || '📄'}</div>
           <div class="mv-info">
             <div class="mv-concepto">${m.concepto}</div>
-            <div class="mv-fecha">${fmtDate(m.fecha)}</div>
+            <div class="mv-fecha">${fmtDate(m.fecha)} ${m.categoria && m.categoria!=='Otros' ? `· ${m.categoria}` : ''}</div>
+            ${m.numero_doc ? `<div style="font-size:11px;color:var(--muted)">N° ${m.numero_doc}</div>` : ''}
             ${m.foto_path ? `<div style="font-size:11px;color:var(--primary)">📎 foto adjunta</div>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
@@ -290,7 +344,9 @@ const ViaticoPage = (() => {
     _editId = mv ? mv.id : null;
     document.getElementById("vmv-modal-title").textContent = mv ? "Editar movimiento" : "Nuevo movimiento";
     document.getElementById("vmv-tipo").value = mv?.tipo || "gasto";
+    document.getElementById("vmv-categoria").value = mv?.categoria || "Otros";
     document.getElementById("vmv-concepto").value = mv?.concepto || "";
+    document.getElementById("vmv-numero-doc").value = mv?.numero_doc || "";
     document.getElementById("vmv-monto").value = mv?.monto || "";
     document.getElementById("vmv-fecha").value = mv ? mv.fecha.substring(0, 10) : today();
     document.getElementById("vmv-foto-preview").style.display = "none";
@@ -313,7 +369,9 @@ const ViaticoPage = (() => {
     const btn = document.getElementById("vmv-save-btn");
     btn.disabled = true;
     try {
-      const data = { tipo, concepto, monto, fecha: fecha ? fecha + "T12:00:00" : undefined };
+      const categoria  = document.getElementById("vmv-categoria").value;
+      const numero_doc = document.getElementById("vmv-numero-doc").value.trim() || null;
+      const data = { tipo, concepto, monto, categoria, numero_doc, fecha: fecha ? fecha + "T12:00:00" : undefined };
       let mv;
       if (_editId) {
         mv = await API.updateViaticoMovement(_editId, data);
@@ -360,6 +418,76 @@ const ViaticoPage = (() => {
       App.toast("Error: " + err.message);
     } finally {
       btn.disabled = false;
+    }
+  }
+
+  // ── Cambio de contraseña ─────────────────────────────────────────────────
+  function openPassword() {
+    document.getElementById("pwd-current").value = "";
+    document.getElementById("pwd-new").value = "";
+    document.getElementById("pwd-repeat").value = "";
+    document.getElementById("pwd-modal").classList.add("open");
+  }
+
+  async function savePassword() {
+    const current   = document.getElementById("pwd-current").value;
+    const newPwd    = document.getElementById("pwd-new").value;
+    const repeat    = document.getElementById("pwd-repeat").value;
+    if (!current || !newPwd) return App.toast("Completa todos los campos");
+    if (newPwd.length < 6)   return App.toast("Minimo 6 caracteres");
+    if (newPwd !== repeat)   return App.toast("Las contraseñas no coinciden");
+    const btn = document.getElementById("pwd-save-btn");
+    btn.disabled = true;
+    try {
+      await API.changePassword(current, newPwd);
+      document.getElementById("pwd-modal").classList.remove("open");
+      App.toast("Contraseña cambiada correctamente");
+    } catch (err) {
+      App.toast("Error: " + err.message);
+    } finally { btn.disabled = false; }
+  }
+
+  // ── Historial de viáticos ─────────────────────────────────────────────────
+  async function openHistorial() {
+    document.getElementById("hist-modal").classList.add("open");
+    document.getElementById("hist-content").innerHTML = `<div style="color:var(--muted)">Cargando...</div>`;
+    try {
+      const todos = await API.listViaticos();
+      const cerrados = todos.filter(v => v.status === "cerrado");
+      if (!cerrados.length) {
+        document.getElementById("hist-content").innerHTML = `<div class="empty-state"><div class="icon">📋</div><p>Sin viáticos anteriores</p></div>`;
+        return;
+      }
+      let html = "";
+      for (const v of cerrados) {
+        const devuelve = v.saldo_actual >= 0;
+        html += `<div class="card" style="padding:14px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <div>
+              <div style="font-weight:700;font-size:14px">${v.project_nombre || 'Proyecto'}</div>
+              <div style="font-size:11px;color:var(--muted)">${v.client_nombre} · ${fmtDate(v.fecha_inicio)} → ${fmtDate(v.fecha_cierre)}</div>
+            </div>
+            <span class="badge badge-closed">Cerrado</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px">
+            <span>Asignado: <strong>${CLP(v.monto_asignado)}</strong></span>
+            <span>Gastado: <strong style="color:var(--danger)">${CLP(v.total_gastos)}</strong></span>
+          </div>
+          <div class="resultado-box ${devuelve?'devuelve':'cobra'}" style="padding:8px;margin:0 0 8px">
+            <div class="resultado-label">${devuelve ? 'Devolvio' : 'Cobro'}</div>
+            <div class="resultado-monto" style="font-size:20px">${CLP(Math.abs(v.saldo_actual))}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" style="flex:1"
+              onclick="App.downloadFile('/api/reports/${v.id}/pdf','rendicion_${v.id}.pdf')">📄 PDF</button>
+            <button class="btn btn-outline btn-sm" style="flex:1"
+              onclick="App.downloadFile('/api/reports/${v.id}/excel','rendicion_${v.id}.xlsx')">📊 Excel</button>
+          </div>
+        </div>`;
+      }
+      document.getElementById("hist-content").innerHTML = html;
+    } catch (err) {
+      document.getElementById("hist-content").innerHTML = `<p style="color:var(--danger)">${err.message}</p>`;
     }
   }
 
@@ -534,7 +662,9 @@ const ViaticoPage = (() => {
 
   function bind() {
     document.getElementById("viat-logout-btn")?.addEventListener("click", () => App.logout());
-    document.getElementById("viat-add-btn")?.addEventListener("click", () => openModal());
+    document.getElementById("viat-hist-btn")?.addEventListener("click", () => openHistorial());
+    document.getElementById("viat-pwd-btn")?.addEventListener("click",  () => openPassword());
+    document.getElementById("viat-add-btn")?.addEventListener("click",  () => openModal());
     document.getElementById("vmv-foto-input")?.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -551,5 +681,5 @@ const ViaticoPage = (() => {
     load();
   }
 
-  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal, openEdit, saveEdit, openAdicional, saveAdicional };
+  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal, openEdit, saveEdit, openAdicional, saveAdicional, openPassword, savePassword, openHistorial };
 })();

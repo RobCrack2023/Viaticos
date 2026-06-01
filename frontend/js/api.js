@@ -83,8 +83,9 @@ const API = (() => {
     _fileToBase64: fileToBase64,
 
     // Auth
-    login: (email, password) => req("POST", "/auth/login", { email, password }),
-    me:    () => req("GET", "/auth/me"),
+    login:          (email, password) => req("POST", "/auth/login", { email, password }),
+    me:             () => req("GET", "/auth/me"),
+    changePassword: (current_password, new_password) => req("PUT", "/auth/change-password", { current_password, new_password }),
 
     // Account — con cache offline
     initAccount:    (saldo_inicial) => req("POST", "/account/init", { saldo_inicial }),
@@ -118,9 +119,12 @@ const API = (() => {
       return req("POST", `/viaticos/movements/${id}/foto`, fd, true);
     },
 
-    // Reportes
-    pdfUrl:   (id) => `${BASE}/reports/${id}/pdf`,
-    excelUrl: (id) => `${BASE}/reports/${id}/excel`,
+    // Reportes viatico
+    pdfUrl:    (id) => `${BASE}/reports/${id}/pdf`,
+    excelUrl:  (id) => `${BASE}/reports/${id}/excel`,
+    // Reportes CC
+    accountPdfUrl:   () => `${BASE}/reports/account/pdf`,
+    accountExcelUrl: () => `${BASE}/reports/account/excel`,
 
     // Admin
     getStats:         () => req("GET", "/admin/stats"),

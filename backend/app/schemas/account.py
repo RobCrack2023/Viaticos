@@ -8,26 +8,29 @@ class AccountInit(BaseModel):
 
 
 class MovementCreate(BaseModel):
-    tipo: str  # giro, compra, ingreso
-    concepto: str
-    monto: float
-    fecha: Optional[datetime] = None
+    tipo:       str
+    concepto:   str
+    monto:      float
+    numero_doc: Optional[str] = None
+    fecha:      Optional[datetime] = None
 
 
 class MovementUpdate(BaseModel):
-    tipo: Optional[str] = None
-    concepto: Optional[str] = None
-    monto: Optional[float] = None
-    fecha: Optional[datetime] = None
+    tipo:       Optional[str]   = None
+    concepto:   Optional[str]   = None
+    monto:      Optional[float] = None
+    numero_doc: Optional[str]   = None
+    fecha:      Optional[datetime] = None
 
 
 class MovementOut(BaseModel):
-    id: int
-    tipo: str
-    concepto: str
-    monto: float
-    foto_path: Optional[str]
-    fecha: datetime
+    id:         int
+    tipo:       str
+    concepto:   str
+    monto:      float
+    numero_doc: Optional[str] = None
+    foto_path:  Optional[str] = None
+    fecha:      datetime
     created_at: datetime
 
     model_config = {"from_attributes": True}
