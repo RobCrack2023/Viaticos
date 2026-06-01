@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
 from .database import engine, Base
-from .models import user, client, project, action_type, account, viatico
+from .models import user, client, project, action_type, account, viatico, movement_photo
 from .routers import auth, admin, accounts, viaticos, reports
 from .core.config import settings
 from .core.security import hash_password

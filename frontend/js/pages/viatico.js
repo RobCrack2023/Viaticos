@@ -252,6 +252,28 @@ const ViaticoPage = (() => {
         </div>
       </div>`;
 
+    // Alerta de saldo bajo (≤ 20% del asignado o negativo)
+    if (!isClosed && v.monto_asignado > 0) {
+      const pctRestante = (v.saldo_actual / v.monto_asignado) * 100;
+      if (v.saldo_actual < 0) {
+        html += `<div style="background:#FEE2E2;border:1.5px solid #FECACA;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:20px">🚨</span>
+          <div>
+            <div style="font-weight:700;color:var(--danger);font-size:13px">Saldo del viático en negativo</div>
+            <div style="font-size:12px;color:var(--danger)">Has gastado ${CLP(Math.abs(v.saldo_actual))} más del monto asignado</div>
+          </div>
+        </div>`;
+      } else if (pctRestante <= 20) {
+        html += `<div style="background:var(--warning-light);border:1.5px solid #FDE68A;border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <span style="font-size:20px">⚠️</span>
+          <div>
+            <div style="font-weight:700;color:var(--warning);font-size:13px">Saldo bajo — queda el ${pctRestante.toFixed(0)}%</div>
+            <div style="font-size:12px;color:var(--warning)">Solo ${CLP(v.saldo_actual)} disponibles del viático</div>
+          </div>
+        </div>`;
+      }
+    }
+
     if (!isClosed) {
       const yaEditado = v.editado === 1;
       const montoOriginal = v.monto_asignado - (v.monto_adicional || 0);
@@ -300,6 +322,15 @@ const ViaticoPage = (() => {
 
     html += `<div class="section-header" style="margin-top:8px">
       <span class="section-title">Movimientos del viático</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input id="vmv-search" type="search" class="form-control" placeholder="🔍 Buscar..."
+        oninput="ViaticoPage.filterMovements()" style="flex:1">
+      <select id="vmv-filter" class="form-control" style="width:130px" onchange="ViaticoPage.filterMovements()">
+        <option value="">Todos</option>
+        <option value="gasto">Gastos</option>
+        <option value="giro">Giros</option>
+      </select>
     </div>`;
 
     const movs = v.movements || [];
@@ -309,13 +340,19 @@ const ViaticoPage = (() => {
       html += `<div class="card" style="padding:8px 16px"><ul class="mv-list">`;
       for (const m of [...movs].reverse()) {
         const icons = { giro: '💵', gasto: '📝' };
-        html += `<li class="mv-item">
+        html += `<li class="mv-item" data-id="${m.id}" data-tipo="${m.tipo}" data-text="${(m.concepto+' '+(m.numero_doc||'')+' '+(m.categoria||'')).toLowerCase()}">
           <div class="mv-icon ${m.tipo}">${icons[m.tipo] || '📄'}</div>
           <div class="mv-info">
             <div class="mv-concepto">${m.concepto}</div>
             <div class="mv-fecha">${fmtDate(m.fecha)} ${m.categoria && m.categoria!=='Otros' ? `· ${m.categoria}` : ''}</div>
             ${m.numero_doc ? `<div style="font-size:11px;color:var(--muted)">N° ${m.numero_doc}</div>` : ''}
-            ${m.foto_path ? `<div style="font-size:11px;color:var(--primary)">📎 foto adjunta</div>` : ''}
+            <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+              ${m.foto_path ? `<span style="font-size:11px;color:var(--primary)">📎</span>` : ''}
+              ${!isClosed ? `<label style="font-size:11px;color:var(--primary);cursor:pointer" title="Agregar foto">
+                📎+ <input type="file" accept="image/*" capture="environment" style="display:none"
+                  onchange="ViaticoPage.addFoto(${m.id},this)">
+              </label>` : ''}
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <div class="mv-monto neg">-${CLP(m.monto)}</div>
@@ -489,6 +526,30 @@ const ViaticoPage = (() => {
     } catch (err) {
       document.getElementById("hist-content").innerHTML = `<p style="color:var(--danger)">${err.message}</p>`;
     }
+  }
+
+  async function addFoto(mvId, input) {
+    const file = input.files[0];
+    if (!file) return;
+    Scanner.showUI(file, async (enhanced) => {
+      try {
+        await API.addFotoViatico(mvId, enhanced);
+        await load();
+        App.toast("Foto agregada");
+      } catch (err) { App.toast("Error: " + err.message); }
+    });
+  }
+
+  function filterMovements() {
+    const q    = (document.getElementById("vmv-search")?.value || "").toLowerCase();
+    const tipo = document.getElementById("vmv-filter")?.value || "";
+    const items = document.querySelectorAll(".mv-item[data-id]");
+    let visible = 0;
+    items.forEach(el => {
+      const show = (!q || (el.dataset.text||"").includes(q)) && (!tipo || el.dataset.tipo === tipo);
+      el.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
   }
 
   async function openEdit() {
@@ -681,5 +742,5 @@ const ViaticoPage = (() => {
     load();
   }
 
-  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal, openEdit, saveEdit, openAdicional, saveAdicional, openPassword, savePassword, openHistorial };
+  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, createViatico, previewClose, confirmClose, openModal, openEdit, saveEdit, openAdicional, saveAdicional, openPassword, savePassword, openHistorial, filterMovements, addFoto };
 })();

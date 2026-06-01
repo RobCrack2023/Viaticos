@@ -145,10 +145,20 @@ const AccountPage = (() => {
         <span class="section-title">Movimientos</span>
         <div style="display:flex;gap:6px">
           <button class="btn btn-outline btn-sm"
-            onclick="App.downloadFile('/api/reports/cc/pdf','cuenta_corriente.pdf')">📄 PDF</button>
+            onclick="App.downloadFile('/api/reports/cc/pdf','cuenta_corriente.pdf')">📄</button>
           <button class="btn btn-outline btn-sm"
-            onclick="App.downloadFile('/api/reports/cc/excel','cuenta_corriente.xlsx')">📊 Excel</button>
+            onclick="App.downloadFile('/api/reports/cc/excel','cuenta_corriente.xlsx')">📊</button>
         </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <input id="mv-search" type="search" class="form-control" placeholder="🔍 Buscar movimiento..."
+          oninput="AccountPage.filterMovements()" style="flex:1">
+        <select id="mv-filter-tipo" class="form-control" style="width:130px" onchange="AccountPage.filterMovements()">
+          <option value="">Todos</option>
+          <option value="ingreso">Ingresos</option>
+          <option value="giro">Giros</option>
+          <option value="compra">Compras</option>
+        </select>
       </div>`;
 
     if (!movs.length) {
@@ -158,13 +168,19 @@ const AccountPage = (() => {
       for (const m of [...movs].reverse()) {
         const icons = { giro: '💵', compra: '🛒', ingreso: '📥' };
         const isPos = m.tipo === 'ingreso';
-        html += `<li class="mv-item">
+        html += `<li class="mv-item" data-id="${m.id}" data-tipo="${m.tipo}" data-text="${(m.concepto+' '+(m.numero_doc||'')).toLowerCase()}">
           <div class="mv-icon ${m.tipo}">${icons[m.tipo]}</div>
           <div class="mv-info">
             <div class="mv-concepto">${m.concepto}</div>
             <div class="mv-fecha">${fmtDate(m.fecha)}</div>
             ${m.numero_doc ? `<div style="font-size:11px;color:var(--muted)">N° ${m.numero_doc}</div>` : ''}
-            ${m.foto_path ? `<div style="font-size:11px;color:var(--primary);margin-top:2px">📎 foto adjunta</div>` : ''}
+            <div style="display:flex;gap:6px;align-items:center;margin-top:2px">
+              ${m.foto_path ? `<span style="font-size:11px;color:var(--primary)">📎</span>` : ''}
+              <label style="font-size:11px;color:var(--primary);cursor:pointer" title="Agregar foto">
+                📎+ <input type="file" accept="image/*" capture="environment" style="display:none"
+                  onchange="AccountPage.addFoto(${m.id},this)">
+              </label>
+            </div>
           </div>
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
             <div class="mv-monto ${isPos ? 'pos' : 'neg'}">${isPos ? '+' : '-'}${CLP(m.monto)}</div>
@@ -175,7 +191,8 @@ const AccountPage = (() => {
           </div>
         </li>`;
       }
-      html += `</ul></div>`;
+      html += `<li id="mv-empty" class="empty-state" style="display:none;padding:20px 0"><p>Sin resultados</p></li>
+      </ul></div>`;
     }
     document.getElementById("acc-content").innerHTML = html;
     document.getElementById("acc-add-btn").style.display = "";
@@ -297,6 +314,34 @@ const AccountPage = (() => {
     }
   }
 
+  async function addFoto(mvId, input) {
+    const file = input.files[0];
+    if (!file) return;
+    Scanner.showUI(file, async (enhanced) => {
+      try {
+        await API.addFotoMovement(mvId, enhanced);
+        await load();
+        App.toast("Foto agregada");
+      } catch (err) { App.toast("Error: " + err.message); }
+    });
+  }
+
+  function filterMovements() {
+    const q    = (document.getElementById("mv-search")?.value || "").toLowerCase();
+    const tipo = document.getElementById("mv-filter-tipo")?.value || "";
+    const items = document.querySelectorAll(".mv-item[data-id]");
+    let visible = 0;
+    items.forEach(el => {
+      const text = el.dataset.text || "";
+      const t    = el.dataset.tipo || "";
+      const show = (!q || text.includes(q)) && (!tipo || t === tipo);
+      el.style.display = show ? "" : "none";
+      if (show) visible++;
+    });
+    const empty = document.getElementById("mv-empty");
+    if (empty) empty.style.display = visible === 0 ? "" : "none";
+  }
+
   async function initAccount() {
     const saldo = parseFloat(document.getElementById("init-saldo").value);
     if (isNaN(saldo)) return App.toast("Ingresa un saldo válido");
@@ -348,5 +393,5 @@ const AccountPage = (() => {
     load();
   }
 
-  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, initAccount, openModal, openAjusteSaldo, closeAjusteModal, saveAjuste };
+  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, initAccount, openModal, openAjusteSaldo, closeAjusteModal, saveAjuste, filterMovements, addFoto };
 })();

@@ -9,6 +9,7 @@ from ..models.client import Client
 from ..models.project import Project
 from ..models.action_type import ActionType
 from ..models.viatico import Viatico, ViaticoMovement, ViaticoStatus
+from ..models.movement_photo import MovementPhoto
 from ..schemas.viatico import (
     ViaticoCreate, ViaticoOut, ViaticoClose, ViaticoEdit, ViaticoAdicional,
     ViaticoMovementCreate, ViaticoMovementUpdate, ViaticoMovementOut,
@@ -232,6 +233,46 @@ def delete_movement(mv_id: int, db: Session = Depends(get_db), current_user: Use
         raise HTTPException(status_code=403, detail="Sin permiso")
     db.delete(mv)
     db.commit()
+
+
+@router.get("/movements/{mv_id}/fotos")
+def list_fotos_viatico(mv_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mv = db.query(ViaticoMovement).filter(ViaticoMovement.id == mv_id).first()
+    if not mv or mv.viatico.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    photos = db.query(MovementPhoto).filter(MovementPhoto.movement_type=="viatico", MovementPhoto.movement_id==mv_id).all()
+    all_fotos = []
+    if mv.foto_path: all_fotos.append({"id": 0, "path": mv.foto_path})
+    all_fotos += [{"id": p.id, "path": p.foto_path} for p in photos]
+    return all_fotos
+
+
+@router.post("/movements/{mv_id}/fotos/add")
+async def add_foto_viatico(mv_id: int, foto: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mv = db.query(ViaticoMovement).filter(ViaticoMovement.id == mv_id).first()
+    if not mv or mv.viatico.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    ext = os.path.splitext(foto.filename)[1] or ".jpg"
+    filename = f"viat_{mv_id}_x{uuid.uuid4().hex[:8]}{ext}"
+    path = os.path.join(settings.UPLOADS_DIR, filename)
+    os.makedirs(settings.UPLOADS_DIR, exist_ok=True)
+    async with aiofiles.open(path, "wb") as f:
+        await f.write(await foto.read())
+    photo = MovementPhoto(movement_type="viatico", movement_id=mv_id, foto_path=filename)
+    db.add(photo); db.commit()
+    return {"id": photo.id, "path": filename}
+
+
+@router.delete("/movements/{mv_id}/fotos/{foto_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_foto_viatico(mv_id: int, foto_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    mv = db.query(ViaticoMovement).filter(ViaticoMovement.id == mv_id).first()
+    if not mv or mv.viatico.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+    photo = db.query(MovementPhoto).filter(MovementPhoto.id==foto_id, MovementPhoto.movement_type=="viatico").first()
+    if not photo: raise HTTPException(404, "Foto no encontrada")
+    try: os.remove(os.path.join(settings.UPLOADS_DIR, photo.foto_path))
+    except: pass
+    db.delete(photo); db.commit()
 
 
 @router.post("/movements/{mv_id}/foto", response_model=ViaticoMovementOut)

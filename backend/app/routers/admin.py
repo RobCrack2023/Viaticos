@@ -46,6 +46,99 @@ def _build_viatico_out(v: Viatico) -> dict:
     }
 
 
+@router.get("/export/excel")
+def export_all_excel(db: Session = Depends(get_db), _: User = Depends(require_admin)):
+    from io import BytesIO
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from fastapi.responses import StreamingResponse
+    from datetime import datetime as dt
+    viaticos = db.query(Viatico).order_by(Viatico.fecha_inicio.desc()).all()
+
+    wb = Workbook()
+    # ── Hoja resumen ──────────────────────────────────────────────────────────
+    ws = wb.active; ws.title = "Resumen"
+    blue = "2563EB"
+    hf = Font(bold=True, color="FFFFFF", size=10)
+    hfill = PatternFill("solid", fgColor=blue)
+    thin = Border(left=Side(style="thin",color="E5E7EB"),right=Side(style="thin",color="E5E7EB"),
+                  top=Side(style="thin",color="E5E7EB"),bottom=Side(style="thin",color="E5E7EB"))
+    for w,col in zip([5,20,20,20,15,14,14,14,12],range(1,10)): ws.column_dimensions[chr(64+col)].width = w
+    ws.merge_cells("A1:I1")
+    ws["A1"] = f"RESUMEN GENERAL DE VIATICOS — Generado {dt.now().strftime('%d/%m/%Y %H:%M')}"
+    ws["A1"].font = Font(bold=True, size=13, color=blue); ws["A1"].alignment = Alignment(horizontal="center")
+    ws.row_dimensions[1].height = 22
+
+    headers = ["#","Usuario","Cliente","Proyecto","Tipo Accion","Inicio","Cierre","Asignado","Gastado","Saldo","Estado"]
+    ws.column_dimensions["J"].width = 14; ws.column_dimensions["K"].width = 12
+    for ci,h in enumerate(headers,1):
+        c = ws.cell(row=3,column=ci,value=h); c.font=hf; c.fill=hfill; c.alignment=Alignment(horizontal="center"); c.border=thin
+
+    total_asig = total_gast = 0
+    for i,v in enumerate(viaticos,1):
+        gastos = sum(m.monto for m in v.movements)
+        saldo  = v.monto_asignado - gastos
+        total_asig += v.monto_asignado; total_gast += gastos
+        row = 3+i
+        fill = PatternFill("solid",fgColor="F9FAFB") if i%2==0 else None
+        vals = [i, v.user.nombre if v.user else "?",
+                v.client.nombre if v.client else "?",
+                v.project.nombre if v.project else "?",
+                v.action_type.nombre if v.action_type else "?",
+                v.fecha_inicio.strftime("%d/%m/%Y") if v.fecha_inicio else "-",
+                v.fecha_cierre.strftime("%d/%m/%Y") if v.fecha_cierre else "-",
+                v.monto_asignado, gastos, saldo, v.status.value.upper()]
+        for ci,val in enumerate(vals,1):
+            c = ws.cell(row=row,column=ci,value=val); c.border=thin
+            if fill: c.fill=fill
+            if ci in (8,9,10): c.number_format='#,##0'; c.alignment=Alignment(horizontal="right")
+            if ci==10 and val<0: c.font=Font(color="DC2626",bold=True)
+            elif ci==10 and val>=0: c.font=Font(color="059669")
+
+    # Totales
+    tr = 3+len(viaticos)+1
+    ws.cell(row=tr,column=7,value="TOTALES").font = Font(bold=True)
+    for ci,val in [(8,total_asig),(9,total_gast),(10,total_asig-total_gast)]:
+        c = ws.cell(row=tr,column=ci,value=val)
+        c.font=Font(bold=True); c.number_format='#,##0'; c.alignment=Alignment(horizontal="right")
+
+    # ── Una hoja por usuario ──────────────────────────────────────────────────
+    users_viat = {}
+    for v in viaticos:
+        uid = v.user_id
+        users_viat.setdefault(uid, {"nombre": v.user.nombre if v.user else "?", "viaticos": []})
+        users_viat[uid]["viaticos"].append(v)
+
+    for uid, ud in users_viat.items():
+        nombre = ud["nombre"][:28]
+        wsu = wb.create_sheet(nombre)
+        wsu.column_dimensions["A"].width = 5; wsu.column_dimensions["B"].width = 14
+        wsu.column_dimensions["C"].width = 14; wsu.column_dimensions["D"].width = 30
+        wsu.column_dimensions["E"].width = 14; wsu.column_dimensions["F"].width = 14
+        wsu.merge_cells("A1:F1")
+        wsu["A1"] = f"Viaticos de {ud['nombre']}"
+        wsu["A1"].font = Font(bold=True, size=12, color=blue); wsu["A1"].alignment = Alignment(horizontal="center")
+        for ci,h in enumerate(["#","Tipo","Fecha","Concepto","Monto","Categoria"],1):
+            c = wsu.cell(row=3,column=ci,value=h); c.font=hf; c.fill=hfill; c.border=thin
+        row = 4
+        for v in ud["viaticos"]:
+            wsu.cell(row=row,column=1,value=f"VIATICO #{v.id}: {v.project.nombre if v.project else '?'} ({v.status.value.upper()})").font=Font(bold=True,color=blue)
+            wsu.merge_cells(f"A{row}:F{row}"); row+=1
+            for i,m in enumerate(v.movements,1):
+                fill = PatternFill("solid",fgColor="F9FAFB") if i%2==0 else None
+                for ci,val in enumerate([i,m.tipo.upper(),m.fecha.strftime("%d/%m/%Y"),m.concepto,m.monto,getattr(m,'categoria','')],1):
+                    c = wsu.cell(row=row,column=ci,value=val); c.border=thin
+                    if fill: c.fill=fill
+                    if ci==5: c.number_format='#,##0'; c.alignment=Alignment(horizontal="right")
+                row+=1
+            row+=1
+
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    fname = f"viaticos_completo_{dt.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={fname}"})
+
+
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     viaticos = db.query(Viatico).all()

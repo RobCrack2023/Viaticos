@@ -98,6 +98,9 @@ const API = (() => {
       const fd = new FormData(); fd.append("foto", file);
       return req("POST", `/account/movements/${id}/foto`, fd, true);
     },
+    listFotosMovement: (id) => req("GET", `/account/movements/${id}/fotos`),
+    addFotoMovement:   (id, file) => { const fd = new FormData(); fd.append("foto", file); return req("POST", `/account/movements/${id}/fotos/add`, fd, true); },
+    deleteFotoMovement:(id, fid) => req("DELETE", `/account/movements/${id}/fotos/${fid}`),
 
     // Viático selects — con cache
     selectClients:     () => cachedGet("select_clients", "/viaticos/select/clients"),
@@ -118,6 +121,9 @@ const API = (() => {
       const fd = new FormData(); fd.append("foto", file);
       return req("POST", `/viaticos/movements/${id}/foto`, fd, true);
     },
+    listFotosViatico:   (id) => req("GET", `/viaticos/movements/${id}/fotos`),
+    addFotoViatico:     (id, file) => { const fd = new FormData(); fd.append("foto", file); return req("POST", `/viaticos/movements/${id}/fotos/add`, fd, true); },
+    deleteFotoViatico:  (id, fid) => req("DELETE", `/viaticos/movements/${id}/fotos/${fid}`),
 
     // Reportes viatico
     pdfUrl:    (id) => `${BASE}/reports/${id}/pdf`,
@@ -128,6 +134,7 @@ const API = (() => {
 
     // Admin
     getStats:         () => req("GET", "/admin/stats"),
+    exportAllExcel:   () => `/api/admin/export/excel`,
     listAllViaticos:  (status) => req("GET", `/admin/viaticos${status ? `?status_filter=${status}` : ""}`),
     deleteViatico:    (id) => req("DELETE", `/admin/viaticos/${id}`),
     listUsers:        () => req("GET",  "/admin/users"),

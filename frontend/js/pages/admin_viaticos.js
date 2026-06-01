@@ -9,7 +9,13 @@ const AdminViaticoPage = (() => {
         <button class="menu-btn" id="av-logout-btn" style="font-size:14px;font-weight:700">Salir</button>
       </div>
       <div style="padding:12px 16px 0">
-        <div class="tabs">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+        <button class="btn btn-outline btn-sm"
+          onclick="App.downloadFile('/api/admin/export/excel','viaticos_completo.xlsx')">
+          📊 Exportar todo
+        </button>
+      </div>
+      <div class="tabs">
           <button class="tab-btn ${_filter==='cerrado'?'active':''}" onclick="AdminViaticoPage.setFilter('cerrado',this)">Cerrados</button>
           <button class="tab-btn ${_filter==='activo'?'active':''}"  onclick="AdminViaticoPage.setFilter('activo',this)">Activos</button>
           <button class="tab-btn ${_filter===''?'active':''}"        onclick="AdminViaticoPage.setFilter('',this)">Todos</button>
