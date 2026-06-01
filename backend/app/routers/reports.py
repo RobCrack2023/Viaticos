@@ -42,7 +42,107 @@ def _calc(v: Viatico):
     return total, saldo
 
 
-# ── PDF ───────────────────────────────────────────────────────────────────────
+# ── Exportar Cuenta Corriente (rutas ANTES de las parametrizadas) ─────────────
+
+def _get_account_report(user: User, db: Session) -> Account:
+    acc = db.query(Account).filter(Account.user_id == user.id).first()
+    if not acc:
+        raise HTTPException(status_code=404, detail="Cuenta corriente no inicializada")
+    return acc
+
+
+def _calc_account_saldo(acc: Account) -> float:
+    s = acc.saldo_inicial
+    for m in acc.movements:
+        s += m.monto if m.tipo == "ingreso" else -m.monto
+    return s
+
+
+@router.get("/cc/pdf")
+def account_pdf(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    acc = _get_account_report(current_user, db)
+    saldo = _calc_account_saldo(acc)
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    story = []
+    title_style = ParagraphStyle("t", parent=styles["Heading1"], fontSize=16, alignment=TA_CENTER, spaceAfter=6)
+    sub_style   = ParagraphStyle("s", parent=styles["Normal"],   fontSize=10, textColor=colors.grey, alignment=TA_CENTER)
+    story.append(Paragraph("ESTADO DE CUENTA CORRIENTE", title_style))
+    story.append(Paragraph(f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style))
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB")))
+    story.append(Spacer(1, 0.4*cm))
+    it = Table([["Colaborador:", current_user.nombre],["Saldo inicial:", CLP(acc.saldo_inicial)],["Saldo actual:", CLP(saldo)]],
+               colWidths=[4*cm, 10*cm])
+    it.setStyle(TableStyle([("FONTNAME",(0,0),(0,-1),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),9),
+                             ("TEXTCOLOR",(0,0),(0,-1),colors.HexColor("#6B7280")),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
+    story.append(it)
+    story.append(Spacer(1,0.4*cm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
+    story.append(Spacer(1,0.4*cm))
+    story.append(Paragraph("MOVIMIENTOS", ParagraphStyle("h2",parent=styles["Heading2"],fontSize=11,spaceAfter=6)))
+    rows = [["#","Fecha","Tipo","N° Doc","Concepto","Monto"]]
+    for i,m in enumerate(acc.movements,1):
+        rows.append([str(i),m.fecha.strftime("%d/%m/%Y"),m.tipo.upper(),m.numero_doc or "-",m.concepto,CLP(m.monto)])
+    mv_t = Table(rows, colWidths=[0.6*cm,2.2*cm,1.8*cm,2.2*cm,8*cm,2.5*cm])
+    mv_t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#2563EB")),
+        ("TEXTCOLOR",(0,0),(-1,0),colors.white),("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+        ("FONTSIZE",(0,0),(-1,-1),8),("ALIGN",(5,0),(5,-1),"RIGHT"),
+        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#F9FAFB")]),
+        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#E5E7EB")),
+        ("BOTTOMPADDING",(0,0),(-1,-1),5),("TOPPADDING",(0,0),(-1,-1),5)]))
+    story.append(mv_t)
+    story.append(Spacer(1,0.6*cm))
+    rt = Table([["Saldo inicial:",CLP(acc.saldo_inicial)],
+                ["Total ingresos:",CLP(sum(m.monto for m in acc.movements if m.tipo=="ingreso"))],
+                ["Total egresos:",CLP(sum(m.monto for m in acc.movements if m.tipo!="ingreso"))],
+                ["SALDO ACTUAL:",CLP(saldo)]],colWidths=[5*cm,3*cm],hAlign="RIGHT")
+    rt.setStyle(TableStyle([("FONTNAME",(0,0),(-1,-2),"Helvetica"),("FONTNAME",(0,-1),(-1,-1),"Helvetica-Bold"),
+        ("FONTSIZE",(0,0),(-1,-1),10),("ALIGN",(1,0),(1,-1),"RIGHT"),
+        ("LINEABOVE",(0,-1),(-1,-1),1,colors.HexColor("#E5E7EB")),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
+    story.append(rt)
+    doc.build(story)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=cuenta_corriente_{datetime.now().strftime('%Y%m%d')}.pdf"})
+
+
+@router.get("/cc/excel")
+def account_excel(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    acc = _get_account_report(current_user, db)
+    saldo = _calc_account_saldo(acc)
+    wb = Workbook(); ws = wb.active; ws.title = "Cuenta Corriente"
+    for col, w in zip("ABCDEF", [5,14,12,14,40,16]): ws.column_dimensions[col].width = w
+    hdr_font = Font(bold=True, color="FFFFFF", size=10)
+    hdr_fill = PatternFill("solid", fgColor="2563EB")
+    thin = Border(left=Side(style="thin",color="E5E7EB"),right=Side(style="thin",color="E5E7EB"),
+                  top=Side(style="thin",color="E5E7EB"),bottom=Side(style="thin",color="E5E7EB"))
+    ws.merge_cells("A1:F1")
+    ws["A1"] = f"ESTADO DE CUENTA CORRIENTE - {current_user.nombre}"
+    ws["A1"].font = Font(bold=True, size=13, color="2563EB")
+    ws["A1"].alignment = Alignment(horizontal="center")
+    ws.row_dimensions[1].height = 22
+    for i,(lbl,val) in enumerate([("Saldo inicial:",CLP(acc.saldo_inicial)),("Saldo actual:",CLP(saldo))],3):
+        ws[f"A{i}"] = lbl; ws[f"A{i}"].font = Font(bold=True, color="6B7280", size=9)
+        ws[f"B{i}"] = val; ws[f"B{i}"].font = Font(size=10)
+    start = 7
+    for ci,h in enumerate(["#","Fecha","Tipo","N Doc","Concepto","Monto"],1):
+        c = ws.cell(row=start,column=ci,value=h)
+        c.font=hdr_font; c.fill=hdr_fill; c.alignment=Alignment(horizontal="center"); c.border=thin
+    for i,m in enumerate(acc.movements,1):
+        row = start+i
+        fill = PatternFill("solid",fgColor="F9FAFB") if i%2==0 else None
+        for ci,val in enumerate([i,m.fecha.strftime("%d/%m/%Y"),m.tipo.upper(),m.numero_doc or "-",m.concepto,m.monto],1):
+            c = ws.cell(row=row,column=ci,value=val); c.border=thin
+            if fill: c.fill=fill
+            if ci==6: c.number_format='#,##0'; c.alignment=Alignment(horizontal="right")
+    buf = BytesIO(); wb.save(buf); buf.seek(0)
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=cuenta_corriente_{datetime.now().strftime('%Y%m%d')}.xlsx"})
+
+
+# ── PDF viatico ───────────────────────────────────────────────────────────────
 
 @router.get("/{viatico_id}/pdf")
 def download_pdf(viatico_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -332,138 +432,3 @@ def download_excel(viatico_id: int, db: Session = Depends(get_db), current_user:
                              headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
-# ── Exportar Cuenta Corriente ─────────────────────────────────────────────────
-
-def _get_account_report(user: User, db: Session) -> Account:
-    acc = db.query(Account).filter(Account.user_id == user.id).first()
-    if not acc:
-        raise HTTPException(status_code=404, detail="Cuenta corriente no inicializada")
-    return acc
-
-
-def _calc_account_saldo(acc: Account) -> float:
-    s = acc.saldo_inicial
-    for m in acc.movements:
-        s += m.monto if m.tipo == "ingreso" else -m.monto
-    return s
-
-
-@router.get("/cc/pdf")
-def account_pdf(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    acc = _get_account_report(current_user, db)
-    saldo = _calc_account_saldo(acc)
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-    styles = getSampleStyleSheet()
-    story = []
-
-    title_style = ParagraphStyle("t", parent=styles["Heading1"], fontSize=16, alignment=TA_CENTER, spaceAfter=6)
-    sub_style   = ParagraphStyle("s", parent=styles["Normal"],   fontSize=10, textColor=colors.grey, alignment=TA_CENTER)
-    label_style = ParagraphStyle("l", parent=styles["Normal"],   fontSize=9,  textColor=colors.grey)
-
-    story.append(Paragraph("ESTADO DE CUENTA CORRIENTE", title_style))
-    story.append(Paragraph(f"Generado el {datetime.now().strftime('%d/%m/%Y %H:%M')}", sub_style))
-    story.append(Spacer(1, 0.4*cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB")))
-    story.append(Spacer(1, 0.4*cm))
-
-    info_data = [
-        ["Colaborador:", current_user.nombre],
-        ["Saldo inicial:", CLP(acc.saldo_inicial)],
-        ["Saldo actual:", CLP(saldo)],
-    ]
-    it = Table(info_data, colWidths=[4*cm, 10*cm])
-    it.setStyle(TableStyle([("FONTNAME",(0,0),(0,-1),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),9),
-                             ("TEXTCOLOR",(0,0),(0,-1),colors.HexColor("#6B7280")),("BOTTOMPADDING",(0,0),(-1,-1),4)]))
-    story.append(it)
-    story.append(Spacer(1, 0.4*cm))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.lightgrey))
-    story.append(Spacer(1, 0.4*cm))
-    story.append(Paragraph("MOVIMIENTOS", ParagraphStyle("h2",parent=styles["Heading2"],fontSize=11,spaceAfter=6)))
-
-    headers = ["#", "Fecha", "Tipo", "N° Doc", "Concepto", "Monto"]
-    rows = [headers]
-    for i, m in enumerate(acc.movements, 1):
-        rows.append([str(i), m.fecha.strftime("%d/%m/%Y"), m.tipo.upper(),
-                     m.numero_doc or "-", m.concepto, CLP(m.monto)])
-
-    mv_table = Table(rows, colWidths=[0.6*cm, 2.2*cm, 1.8*cm, 2.2*cm, 8*cm, 2.5*cm])
-    mv_table.setStyle(TableStyle([
-        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#2563EB")),
-        ("TEXTCOLOR",(0,0),(-1,0),colors.white),("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-        ("FONTSIZE",(0,0),(-1,-1),8),("ALIGN",(5,0),(5,-1),"RIGHT"),
-        ("ROWBACKGROUNDS",(0,1),(-1,-1),[colors.white,colors.HexColor("#F9FAFB")]),
-        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#E5E7EB")),
-        ("BOTTOMPADDING",(0,0),(-1,-1),5),("TOPPADDING",(0,0),(-1,-1),5),
-    ]))
-    story.append(mv_table)
-    story.append(Spacer(1, 0.6*cm))
-
-    res_data = [["Saldo inicial:", CLP(acc.saldo_inicial)],
-                ["Total ingresos:", CLP(sum(m.monto for m in acc.movements if m.tipo=="ingreso"))],
-                ["Total egresos:", CLP(sum(m.monto for m in acc.movements if m.tipo!="ingreso"))],
-                ["SALDO ACTUAL:", CLP(saldo)]]
-    rt = Table(res_data, colWidths=[5*cm, 3*cm], hAlign="RIGHT")
-    rt.setStyle(TableStyle([
-        ("FONTNAME",(0,0),(-1,-2),"Helvetica"),("FONTNAME",(0,-1),(-1,-1),"Helvetica-Bold"),
-        ("FONTSIZE",(0,0),(-1,-1),10),("ALIGN",(1,0),(1,-1),"RIGHT"),
-        ("LINEABOVE",(0,-1),(-1,-1),1,colors.HexColor("#E5E7EB")),
-        ("BOTTOMPADDING",(0,0),(-1,-1),5),
-    ]))
-    story.append(rt)
-
-    doc.build(story)
-    buf.seek(0)
-    filename = f"cuenta_corriente_{datetime.now().strftime('%Y%m%d')}.pdf"
-    return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
-
-
-@router.get("/cc/excel")
-def account_excel(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    acc = _get_account_report(current_user, db)
-    saldo = _calc_account_saldo(acc)
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Cuenta Corriente"
-    ws.column_dimensions["A"].width = 5
-    ws.column_dimensions["B"].width = 14
-    ws.column_dimensions["C"].width = 12
-    ws.column_dimensions["D"].width = 14
-    ws.column_dimensions["E"].width = 40
-    ws.column_dimensions["F"].width = 16
-    blue = "2563EB"
-    hdr_font = Font(bold=True, color="FFFFFF", size=10)
-    hdr_fill = PatternFill("solid", fgColor=blue)
-    thin = Border(left=Side(style="thin",color="E5E7EB"),right=Side(style="thin",color="E5E7EB"),
-                  top=Side(style="thin",color="E5E7EB"),bottom=Side(style="thin",color="E5E7EB"))
-
-    ws.merge_cells("A1:F1")
-    ws["A1"] = f"ESTADO DE CUENTA CORRIENTE — {current_user.nombre}"
-    ws["A1"].font = Font(bold=True, size=13, color=blue)
-    ws["A1"].alignment = Alignment(horizontal="center")
-    ws.row_dimensions[1].height = 22
-
-    for i, (lbl, val) in enumerate([("Saldo inicial:",CLP(acc.saldo_inicial)),("Saldo actual:",CLP(saldo))], 3):
-        ws[f"A{i}"] = lbl; ws[f"A{i}"].font = Font(bold=True, color="6B7280", size=9)
-        ws[f"B{i}"] = val; ws[f"B{i}"].font = Font(size=10)
-
-    start = 7
-    for ci, h in enumerate(["#","Fecha","Tipo","N° Doc","Concepto","Monto"], 1):
-        c = ws.cell(row=start, column=ci, value=h)
-        c.font = hdr_font; c.fill = hdr_fill; c.alignment = Alignment(horizontal="center"); c.border = thin
-
-    light = "F9FAFB"
-    for i, m in enumerate(acc.movements, 1):
-        row = start + i
-        fill = PatternFill("solid", fgColor=light) if i%2==0 else None
-        for ci, val in enumerate([i, m.fecha.strftime("%d/%m/%Y"), m.tipo.upper(),
-                                   m.numero_doc or "-", m.concepto, m.monto], 1):
-            c = ws.cell(row=row, column=ci, value=val)
-            c.border = thin
-            if fill: c.fill = fill
-            if ci == 6: c.number_format = '#,##0'; c.alignment = Alignment(horizontal="right")
-
-    buf = BytesIO(); wb.save(buf); buf.seek(0)
-    filename = f"cuenta_corriente_{datetime.now().strftime('%Y%m%d')}.xlsx"
-    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": f"attachment; filename={filename}"})
