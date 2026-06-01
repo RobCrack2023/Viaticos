@@ -85,6 +85,7 @@ const AccountPage = (() => {
   }
 
   async function load() {
+    _showAll = false; // siempre empezar mostrando solo el período actual
     try {
       [_account, _viatico] = await Promise.all([
         API.getAccount().catch(() => null),

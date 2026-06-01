@@ -137,6 +137,8 @@ const API = (() => {
     exportAllExcel:   () => `/api/admin/export/excel`,
     listAllViaticos:  (status) => req("GET", `/admin/viaticos${status ? `?status_filter=${status}` : ""}`),
     deleteViatico:    (id) => req("DELETE", `/admin/viaticos/${id}`),
+    deleteAccountMovementsByPeriod: (userId, fi, ff) =>
+      req("DELETE", `/admin/account-movements/period?user_id=${userId}&fecha_inicio=${encodeURIComponent(fi)}&fecha_fin=${encodeURIComponent(ff)}`),
     listUsers:        () => req("GET",  "/admin/users"),
     createUser:       (data) => req("POST", "/admin/users", data),
     updateUser:       (id, data) => req("PUT", `/admin/users/${id}`, data),

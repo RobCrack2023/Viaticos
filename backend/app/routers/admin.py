@@ -192,6 +192,43 @@ def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     }
 
 
+@router.delete("/account-movements/period")
+def delete_account_movements_by_period(
+    user_id: int,
+    fecha_inicio: str,
+    fecha_fin: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Elimina movimientos de CC de un usuario en un rango de fechas."""
+    from ..models.account import AccountMovement, Account
+    from datetime import datetime
+    import os
+    acc = db.query(Account).filter(Account.user_id == user_id).first()
+    if not acc:
+        return  # sin cuenta CC, nada que borrar
+    try:
+        fi = datetime.fromisoformat(fecha_inicio.replace("Z", "+00:00"))
+        ff = datetime.fromisoformat(fecha_fin.replace("Z", "+00:00"))
+    except Exception:
+        return
+    movs = db.query(AccountMovement).filter(
+        AccountMovement.account_id == acc.id,
+        AccountMovement.fecha >= fi,
+        AccountMovement.fecha <= ff,
+    ).all()
+    for m in movs:
+        if m.foto_path:
+            try:
+                foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+                if os.path.exists(foto_abs):
+                    os.remove(foto_abs)
+            except Exception:
+                pass
+        db.delete(m)
+    db.commit()
+
+
 @router.delete("/viaticos/{viatico_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_viatico(viatico_id: int, db: Session = Depends(get_db), _: User = Depends(require_admin)):
     v = db.query(Viatico).filter(Viatico.id == viatico_id).first()

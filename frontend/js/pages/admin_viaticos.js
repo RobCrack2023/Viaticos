@@ -1,6 +1,6 @@
 const AdminViaticoPage = (() => {
-  let _filter = "cerrado"; // por defecto: viáticos cerrados
-  let _viaticos = [];
+  let _filter   = "cerrado";
+  let _viaticos = [];   // guardamos para acceder en confirmDelete
 
   function render() {
     return `
@@ -132,13 +132,28 @@ const AdminViaticoPage = (() => {
   }
 
   async function confirmDelete(id, nombre) {
-    // Primera confirmación
-    if (!confirm(`¿Eliminar el viático de "${nombre}"?\n\nEsta acción eliminará todos los movimientos y fotos. No se puede deshacer.`)) return;
-    // Segunda confirmación (doble seguridad)
+    if (!confirm(`¿Eliminar el viático de "${nombre}"?\n\nEsta acción eliminará todos los movimientos y fotos del viático.\nNo se puede deshacer.`)) return;
     if (!confirm(`CONFIRMACIÓN FINAL\n\n¿Seguro que deseas eliminar permanentemente el viático de "${nombre}"?`)) return;
+
+    // Preguntar si también limpiar movimientos de CC del mismo período
+    const cleanCC = confirm(
+      `¿Deseas también eliminar los movimientos de Cuenta Corriente de ese período?\n\n` +
+      `Responde SÍ solo si esos movimientos correspondían únicamente a este viático.\n` +
+      `Si había otros gastos del banco en ese período, responde NO.`
+    );
 
     try {
       await API.deleteViatico(id);
+
+      if (cleanCC) {
+        // Buscar el viático para saber las fechas (ya fue eliminado del server)
+        // Usar los datos que ya tenemos en _viaticos
+        const v = _viaticos.find(x => x.id === id);
+        if (v) {
+          await API.deleteAccountMovementsByPeriod(v.user_id, v.fecha_inicio, v.fecha_cierre || new Date().toISOString());
+        }
+      }
+
       App.toast("Viático eliminado correctamente");
       await load();
     } catch (err) {
