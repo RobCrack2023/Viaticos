@@ -102,6 +102,33 @@ def account_pdf(db: Session = Depends(get_db), current_user: User = Depends(get_
         ("FONTSIZE",(0,0),(-1,-1),10),("ALIGN",(1,0),(1,-1),"RIGHT"),
         ("LINEABOVE",(0,-1),(-1,-1),1,colors.HexColor("#E5E7EB")),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
     story.append(rt)
+
+    # Fotos de comprobantes de CC
+    movs_foto = [(i, m) for i, m in enumerate(acc.movements, 1) if m.foto_path]
+    if movs_foto:
+        story.append(Spacer(1, 0.8*cm))
+        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#2563EB")))
+        story.append(Spacer(1, 0.4*cm))
+        story.append(Paragraph("COMPROBANTES FOTOGRAFICOS", ParagraphStyle("hf", parent=styles["Heading2"], fontSize=11, spaceAfter=8)))
+        MAX_W, MAX_H = 15*cm, 10*cm
+        for i, m in movs_foto:
+            foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+            if not os.path.exists(foto_abs): continue
+            try:
+                with PILImage.open(foto_abs) as pil:
+                    pw, ph = pil.size
+                ratio = min(MAX_W/pw, MAX_H/ph)
+                lbl = ParagraphStyle("fl", parent=styles["Normal"], fontSize=9,
+                                     textColor=colors.HexColor("#6B7280"), spaceBefore=4, spaceAfter=4)
+                bloque = [
+                    Paragraph(f"<b>#{i}</b> - {m.tipo.upper()} | {m.concepto} | {m.fecha.strftime('%d/%m/%Y')} | {CLP(m.monto)}", lbl),
+                    Image(foto_abs, width=pw*ratio, height=ph*ratio),
+                    Spacer(1, 0.5*cm),
+                ]
+                story.append(KeepTogether(bloque))
+            except Exception:
+                pass
+
     doc.build(story)
     buf.seek(0)
     return StreamingResponse(buf, media_type="application/pdf",
@@ -137,6 +164,41 @@ def account_excel(db: Session = Depends(get_db), current_user: User = Depends(ge
             c = ws.cell(row=row,column=ci,value=val); c.border=thin
             if fill: c.fill=fill
             if ci==6: c.number_format='#,##0'; c.alignment=Alignment(horizontal="right")
+    # Hoja de comprobantes fotográficos
+    movs_foto = [(i, m) for i, m in enumerate(acc.movements, 1) if m.foto_path]
+    if movs_foto:
+        from openpyxl.drawing.image import Image as XLImage
+        ws2 = wb.create_sheet("Comprobantes")
+        ws2.column_dimensions["A"].width = 6
+        ws2.column_dimensions["B"].width = 60
+        ws2["A1"] = "COMPROBANTES FOTOGRAFICOS - CUENTA CORRIENTE"
+        ws2["A1"].font = Font(bold=True, size=13, color="2563EB")
+        ws2.merge_cells("A1:B1")
+        ws2.row_dimensions[1].height = 22
+        cur_row = 3
+        for i, m in movs_foto:
+            foto_abs = os.path.join(settings.UPLOADS_DIR, m.foto_path)
+            if not os.path.exists(foto_abs): continue
+            try:
+                ws2[f"A{cur_row}"] = f"#{i}"
+                ws2[f"A{cur_row}"].font = Font(bold=True, size=10, color="2563EB")
+                ws2[f"B{cur_row}"] = f"{m.tipo.upper()} | {m.concepto} | {m.fecha.strftime('%d/%m/%Y')} | ${m.monto:,.0f}"
+                ws2[f"B{cur_row}"].font = Font(size=10)
+                cur_row += 1
+                with PILImage.open(foto_abs) as pil:
+                    pw, ph = pil.size
+                ratio = min(500/pw, 500/ph, 1)
+                xl_img = XLImage(foto_abs)
+                xl_img.width = int(pw*ratio); xl_img.height = int(ph*ratio)
+                ws2.add_image(xl_img, f"B{cur_row}")
+                rows_needed = max(1, xl_img.height // 15)
+                for r in range(cur_row, cur_row + rows_needed):
+                    ws2.row_dimensions[r].height = 15
+                cur_row += rows_needed + 2
+            except Exception:
+                ws2[f"B{cur_row}"] = f"#{i} - imagen no disponible"
+                cur_row += 2
+
     buf = BytesIO(); wb.save(buf); buf.seek(0)
     return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=cuenta_corriente_{datetime.now().strftime('%Y%m%d')}.xlsx"})
