@@ -145,9 +145,9 @@ const AccountPage = (() => {
         <span class="section-title">Movimientos</span>
         <div style="display:flex;gap:6px">
           <button class="btn btn-outline btn-sm"
-            onclick="App.downloadFile('/api/reports/account/pdf','cuenta_corriente.pdf')">📄 PDF</button>
+            onclick="App.downloadFile('/api/reports/cc/pdf','cuenta_corriente.pdf')">📄 PDF</button>
           <button class="btn btn-outline btn-sm"
-            onclick="App.downloadFile('/api/reports/account/excel','cuenta_corriente.xlsx')">📊 Excel</button>
+            onclick="App.downloadFile('/api/reports/cc/excel','cuenta_corriente.xlsx')">📊 Excel</button>
         </div>
       </div>`;
 

@@ -348,7 +348,7 @@ def _calc_account_saldo(acc: Account) -> float:
     return s
 
 
-@router.get("/account/pdf")
+@router.get("/cc/pdf")
 def account_pdf(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     acc = _get_account_report(current_user, db)
     saldo = _calc_account_saldo(acc)
@@ -418,7 +418,7 @@ def account_pdf(db: Session = Depends(get_db), current_user: User = Depends(get_
     return StreamingResponse(buf, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
-@router.get("/account/excel")
+@router.get("/cc/excel")
 def account_excel(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     acc = _get_account_report(current_user, db)
     saldo = _calc_account_saldo(acc)

@@ -123,8 +123,8 @@ const API = (() => {
     pdfUrl:    (id) => `${BASE}/reports/${id}/pdf`,
     excelUrl:  (id) => `${BASE}/reports/${id}/excel`,
     // Reportes CC
-    accountPdfUrl:   () => `${BASE}/reports/account/pdf`,
-    accountExcelUrl: () => `${BASE}/reports/account/excel`,
+    accountPdfUrl:   () => `${BASE}/reports/cc/pdf`,
+    accountExcelUrl: () => `${BASE}/reports/cc/excel`,
 
     // Admin
     getStats:         () => req("GET", "/admin/stats"),
