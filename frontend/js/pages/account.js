@@ -1,6 +1,8 @@
 const AccountPage = (() => {
-  let _account = null;
-  let _editId = null;
+  let _account    = null;
+  let _viatico    = null;   // viático activo (para filtrar por período)
+  let _showAll    = false;  // mostrar todo el historial o solo período actual
+  let _editId     = null;
 
   function render() {
     return `
@@ -84,16 +86,21 @@ const AccountPage = (() => {
 
   async function load() {
     try {
-      _account = await API.getAccount();
-      if (!_account) {
-        renderInit();
-        return;
-      }
+      [_account, _viatico] = await Promise.all([
+        API.getAccount().catch(() => null),
+        API.getActiveViatico().catch(() => null),
+      ]);
+      if (!_account) { renderInit(); return; }
       renderContent();
     } catch (err) {
       document.getElementById("acc-content").innerHTML =
         `<div class="empty-state"><div class="icon">⚠️</div><p>${err.message}</p></div>`;
     }
+  }
+
+  function toggleHistory() {
+    _showAll = !_showAll;
+    renderContent();
   }
 
   function renderInit() {
@@ -111,8 +118,14 @@ const AccountPage = (() => {
   }
 
   function renderContent() {
-    const saldo = _account.saldo_actual;
-    const movs = _account.movements || [];
+    const saldo    = _account.saldo_actual;
+    const allMovs  = _account.movements || [];
+
+    // Filtrar por período del viático activo (o mostrar todo si _showAll)
+    const viatStart = _viatico?.fecha_inicio ? new Date(_viatico.fecha_inicio) : null;
+    const movs = (!_showAll && viatStart)
+      ? allMovs.filter(m => new Date(m.fecha) >= viatStart)
+      : allMovs;
     let html = `
       <div class="hero-card" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -150,6 +163,18 @@ const AccountPage = (() => {
             onclick="App.downloadFile('/api/reports/cc/excel','cuenta_corriente.xlsx')">📊</button>
         </div>
       </div>
+      ${viatStart && !_showAll ? `
+      <div style="background:var(--primary-light);border:1px solid var(--primary-mid);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;color:var(--primary)">
+          <strong>📅 Período del viático activo</strong><br>
+          <span style="color:var(--muted)">Desde ${fmtDate(_viatico.fecha_inicio)} · ${allMovs.length - movs.length} mov. anteriores ocultos</span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="AccountPage.toggleHistory()">Ver todo</button>
+      </div>` : _showAll && viatStart ? `
+      <div style="background:var(--warning-light);border:1px solid #FDE68A;border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:var(--warning)">📋 Mostrando historial completo (${allMovs.length} movimientos)</span>
+        <button class="btn btn-outline btn-sm" onclick="AccountPage.toggleHistory()">Solo período actual</button>
+      </div>` : ''}
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <input id="mv-search" type="search" class="form-control" placeholder="🔍 Buscar movimiento..."
           oninput="AccountPage.filterMovements()" style="flex:1">
@@ -393,5 +418,5 @@ const AccountPage = (() => {
     load();
   }
 
-  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, initAccount, openModal, openAjusteSaldo, closeAjusteModal, saveAjuste, filterMovements, addFoto };
+  return { render, bind, load, closeModal, saveMovement, editMovement, deleteMovement, initAccount, openModal, openAjusteSaldo, closeAjusteModal, saveAjuste, filterMovements, addFoto, toggleHistory };
 })();
