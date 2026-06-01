@@ -63,6 +63,7 @@ class ViaticoOut(BaseModel):
     status:          str
     fecha_inicio:    datetime
     fecha_cierre:    Optional[datetime]
+    created_at:      datetime
     observaciones:   Optional[str]
     saldo_actual:    float = 0.0
     total_gastos:    float = 0.0

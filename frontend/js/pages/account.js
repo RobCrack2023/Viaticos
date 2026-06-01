@@ -122,10 +122,12 @@ const AccountPage = (() => {
     const saldo    = _account.saldo_actual;
     const allMovs  = _account.movements || [];
 
-    // Filtrar por período del viático activo (o mostrar todo si _showAll)
-    const viatStart = _viatico?.fecha_inicio ? new Date(_viatico.fecha_inicio) : null;
+    // Filtrar por cuándo se CREÓ el viático activo (created_at),
+    // no la fecha_inicio ingresada por el usuario.
+    // Así si dos viáticos son el mismo día, el corte es exacto por hora.
+    const viatStart = _viatico?.created_at ? new Date(_viatico.created_at) : null;
     const movs = (!_showAll && viatStart)
-      ? allMovs.filter(m => new Date(m.fecha) >= viatStart)
+      ? allMovs.filter(m => new Date(m.created_at) >= viatStart)
       : allMovs;
     let html = `
       <div class="hero-card" style="margin-bottom:10px">
@@ -168,7 +170,7 @@ const AccountPage = (() => {
       <div style="background:var(--primary-light);border:1px solid var(--primary-mid);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center">
         <div style="font-size:12px;color:var(--primary)">
           <strong>📅 Período del viático activo</strong><br>
-          <span style="color:var(--muted)">Desde ${fmtDate(_viatico.fecha_inicio)} · ${allMovs.length - movs.length} mov. anteriores ocultos</span>
+          <span style="color:var(--muted)">Desde ${fmtDate(_viatico.created_at)} ${new Date(_viatico.created_at).toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})} · ${allMovs.length - movs.length} mov. anteriores ocultos</span>
         </div>
         <button class="btn btn-outline btn-sm" onclick="AccountPage.toggleHistory()">Ver todo</button>
       </div>` : _showAll && viatStart ? `
